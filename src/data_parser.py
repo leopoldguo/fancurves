@@ -44,3 +44,52 @@ def convert_flow_units(value: float, from_unit: str, to_unit: str, density: floa
         return m3_min * 35.3146667
         
     raise ValueError(f"不支持的单位转换: {from_unit} 到 {to_unit}")
+
+def filter_operating_points(df: pd.DataFrame, flow_col: str, pressure_col: str, min_pressure: float):
+    # 1. 找到各个转速下的喘振点 (假设为质量流量最小的点)
+    surge_points = []
+    
+    # 确保转速列存在，否则直接返回
+    if "speed_rpm" not in df.columns:
+        return df, pd.DataFrame()
+        
+    for speed in df["speed_rpm"].unique():
+        speed_df = df[df["speed_rpm"] == speed]
+        # 找到该转速下流量最小的行
+        surge_row = speed_df.loc[speed_df[flow_col].idxmin()]
+        surge_points.append(surge_row)
+        
+    surge_df = pd.DataFrame(surge_points).sort_values(by="speed_rpm")
+    
+    # 提取最低转速和最高转速的喘振点建立喘振线，或者使用所有的喘振点本身（通常直接使用线段连接）
+    if len(surge_df) >= 2:
+        # 用户需求：以最高转速的喘振点和最低转速的喘振点拉一条直线
+        min_surge = surge_df.iloc[0]
+        max_surge = surge_df.iloc[-1]
+        
+        flow_min, p_min = min_surge[flow_col], min_surge[pressure_col]
+        flow_max, p_max = max_surge[flow_col], max_surge[pressure_col]
+        
+        # 直线方程: flow = m * pressure + b
+        if p_max != p_min:
+            m = (flow_max - flow_min) / (p_max - p_min)
+            b = flow_min - m * p_min
+            
+            # 使用直线方程过滤：要求 flow >= 计算出的喘振边界 flow
+            # 也就意味着在“喘振线右侧”
+            df = df[df[flow_col] >= (m * df[pressure_col] + b)]
+            
+            # 喘振线的作图数据
+            surge_line_df = pd.DataFrame({
+                flow_col: [flow_min, flow_max],
+                pressure_col: [p_min, p_max]
+            })
+        else:
+            surge_line_df = surge_df
+    else:
+        surge_line_df = surge_df
+        
+    # 2. 最低压力过滤
+    df = df[df[pressure_col] >= min_pressure]
+    
+    return df, surge_line_df

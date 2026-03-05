@@ -23,3 +23,23 @@ def test_convert_flow_units():
     
     val_cfm = convert_flow_units(1.0, from_unit="m3/min", to_unit="CFM")
     assert round(val_cfm, 2) == 35.31
+
+from src.data_parser import filter_operating_points
+
+def test_filter_operating_points():
+    df = pd.DataFrame({
+        "speed_rpm": [1000, 1000, 2000, 2000],
+        "display_flow": [0.5, 1.0, 1.5, 2.0],
+        "pressure_ratio": [1.2, 1.1, 1.8, 1.5]
+    })
+    
+    # 喘振点将通过最低流量找到：1000转 (0.5, 1.2), 2000转 (1.5, 1.8)
+    # 假设我们设定最低压比为 1.15，那么点 (1.0, 1.1) 应该被过滤掉
+    
+    filtered_df, surge_line_df = filter_operating_points(df, flow_col="display_flow", pressure_col="pressure_ratio", min_pressure=1.15)
+    
+    assert len(filtered_df) == 3
+    assert 1.1 not in filtered_df["pressure_ratio"].values
+    
+    # 检查喘振线是否包含两个点
+    assert len(surge_line_df) == 2
