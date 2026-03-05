@@ -9,7 +9,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 _SMOOTH_POINTS = 300
-
+_CONTOUR_PTS   = 600   # denser output for contour curves
 
 # ─── Performance curve smoothing ─────────────────────────────────────────────
 
@@ -19,6 +19,7 @@ def _smooth_series(
     n_points: int = _SMOOTH_POINTS,
     smooth_level: float = 3.0,
 ) -> tuple:
+    """Smooth a 1-D series via UnivariateSpline."""
     if len(x) < 4:
         return x, y
     order = np.argsort(x)
@@ -44,51 +45,73 @@ def _smooth_series(
 # ─── Iso-efficiency contour helpers ──────────────────────────────────────────
 
 def _is_closed_path(px: np.ndarray, py: np.ndarray, threshold: float = 0.02) -> bool:
-    """Check if a contour segment is closed (first ≈ last point)."""
     path_len = float(np.sum(np.sqrt(np.diff(px)**2 + np.diff(py)**2)))
     endpoint_dist = float(np.sqrt((px[0] - px[-1])**2 + (py[0] - py[-1])**2))
-    if path_len < 1e-12:
-        return False
-    return endpoint_dist < threshold * path_len
+    return path_len > 1e-12 and endpoint_dist < threshold * path_len
 
 
-def _smooth_path(px: np.ndarray, py: np.ndarray, n_pts: int = 500) -> tuple:
+def _smooth_path(
+    px: np.ndarray,
+    py: np.ndarray,
+    n_pts: int = _CONTOUR_PTS,
+    smooth_level: float = 3.0,
+) -> tuple:
     """
-    Densify a 2D contour path using splprep(s=0):
-    - Closed paths (first≈last): per=True → smooth, perfectly closed ring
-    - Open paths: per=False → ends are preserved exactly, no artificial closure
+    Smooth a 2-D contour path using splprep, analogous to how _smooth_series
+    works for 1-D performance curves.
 
-    s=0 means exact interpolation through all vertices — the cubic spline only
-    adds curvature BETWEEN vertices, never deviating from the original path.
+    The smoothing factor s is auto-scaled to the path's geometric variance,
+    then multiplied by the same level-to-multiplier mapping as _smooth_series.
+
+    smooth_level 0   → s=0, exact through every vertex (only densification)
+    smooth_level 3   → moderate curvature, recommended
+    smooth_level 10  → strong smoothing; contour deviates visibly from grid
+
+    Closed paths (BEP inner ring) use per=True for seamless circular closure.
+    Open paths use per=False; endpoints are naturally preserved.
     """
     if len(px) < 4:
         return px, py
     # Remove consecutive duplicates
-    mask = np.concatenate(([True], np.diff(px)**2 + np.diff(py)**2 > 1e-20))
-    px, py = px[mask], py[mask]
+    dup = np.concatenate(([True], np.diff(px)**2 + np.diff(py)**2 > 1e-20))
+    px, py = px[dup], py[dup]
     if len(px) < 4:
         return px, py
 
     closed = _is_closed_path(px, py)
+    n = len(px)
+
+    # Auto-scale s to path geometry — same spirit as _smooth_series
+    # Use mean variance of x and y, scaled by n
+    auto_s_x = max(float(n) * float(np.var(px)), 1e-12)
+    auto_s_y = max(float(n) * float(np.var(py)), 1e-12)
+    auto_s   = (auto_s_x + auto_s_y) / 2.0
+
+    if smooth_level <= 0.0:
+        s = 0.0
+    else:
+        multiplier = 0.05 * (10 ** (smooth_level / 10 * np.log10(100)))
+        s = auto_s * multiplier
+
     try:
-        k = min(3, len(px) - 1)
-        tck, _ = splprep([px, py], s=0, k=k, per=closed)
+        k = min(3, n - 1)
+        tck, _ = splprep([px, py], s=s, k=k, per=closed)
         u_fine = np.linspace(0., 1., n_pts)
         x_s, y_s = splev(u_fine, tck)
-        return x_s, y_s
+        return np.array(x_s), np.array(y_s)
     except Exception:
         return px, py
 
 
-def _mask_below_min_speed(EI_pct: np.ndarray,
-                           xi: np.ndarray, yi: np.ndarray,
-                           df: pd.DataFrame,
-                           x_col: str, y_col: str) -> np.ndarray:
-    """
-    Set efficiency-grid cells to NaN in the region below the lowest-RPM
-    performance curve. This prevents contours from being drawn in regions
-    that are physically outside the operating envelope.
-    """
+def _mask_below_min_speed(
+    EI_pct: np.ndarray,
+    xi: np.ndarray,
+    yi: np.ndarray,
+    df: pd.DataFrame,
+    x_col: str,
+    y_col: str,
+) -> np.ndarray:
+    """Mask efficiency grid cells below the lowest-RPM performance curve."""
     if "speed_rpm" not in df.columns:
         return EI_pct
     min_speed = df["speed_rpm"].min()
@@ -114,12 +137,7 @@ def _mask_below_min_speed(EI_pct: np.ndarray,
 
 
 def _extract_contour_paths(xi, yi, grid_pct, levels_pct):
-    """
-    Use matplotlib (Agg backend, non-displayed) to extract contour path
-    segments. Returns list of (level_value_pct, x_array, y_array).
-    Segments that are natural closed loops (around BEP) are returned as
-    such by matplotlib's contouring algorithm.
-    """
+    """Extract contour paths via matplotlib (Agg backend)."""
     import numpy.ma as ma
     grid_masked = ma.masked_invalid(grid_pct)
     fig_mpl, ax_mpl = plt.subplots()
@@ -148,19 +166,12 @@ def _add_efficiency_contours(
     y_col: str,
     eff_col: str = "efficiency",
     contour_step_pct: float = 2.0,
-    grid_n: int = 300,
+    smooth_level: float = 3.0,
+    grid_n: int = 400,
 ) -> go.Figure:
     """
-    Overlay iso-efficiency contours with three key behaviours:
-
-    1. Innermost ring (around BEP): matplotlib returns it as a closed loop.
-       splprep(per=True) makes it a perfectly smooth, circular/elliptical ring.
-
-    2. Outer rings that reach the data boundary: matplotlib returns them as
-       open segments. splprep(per=False) keeps endpoints honest, no fake closure.
-
-    3. Region below lowest-RPM performance curve: masked to NaN before
-       computing contours, so no contour lines are drawn there.
+    Overlay smooth iso-efficiency contours.
+    smooth_level is shared with performance curves so one slider controls both.
     """
     if eff_col not in df.columns or df[eff_col].isna().all():
         return fig
@@ -174,23 +185,18 @@ def _add_efficiency_contours(
         return fig
     x_data, y_data, eff_data = x_data[valid], y_data[valid], eff_data[valid]
 
-    # BEP from raw data
     bep_idx     = int(np.nanargmax(eff_data))
     bep_x       = float(x_data[bep_idx])
     bep_y       = float(y_data[bep_idx])
     bep_eta_pct = float(eff_data[bep_idx]) * 100.0
 
-    # 2-D efficiency grid (%)
     xi = np.linspace(x_data.min(), x_data.max(), grid_n)
     yi = np.linspace(y_data.min(), y_data.max(), grid_n)
     XI, YI = np.meshgrid(xi, yi)
     EI_pct = griddata((x_data, y_data), eff_data * 100.0, (XI, YI),
-                       method="linear")   # NaN outside convex hull
-
-    # Mask region below lowest-RPM curve so no contours appear there
+                       method="linear")
     EI_pct = _mask_below_min_speed(EI_pct, xi, yi, df, x_col, y_col)
 
-    # Contour levels (%)
     step      = contour_step_pct
     bep_floor = float(np.floor(bep_eta_pct / step) * step)
     lo_level  = max(step, bep_floor - 10 * step)
@@ -204,15 +210,11 @@ def _add_efficiency_contours(
     shown_levels   = set()
 
     for level_pct, px, py in segments:
-        px_arr  = np.array(px)
-        py_arr  = np.array(py)
-        closed  = _is_closed_path(px_arr, py_arr)
-        px_s, py_s = _smooth_path(px_arr, py_arr)
-
+        px_s, py_s = _smooth_path(np.array(px), np.array(py),
+                                   smooth_level=smooth_level)
         color          = _level_color(level_pct, lo_pct, hi_pct)
         show_in_legend = level_pct not in shown_levels
         shown_levels.add(level_pct)
-
         mid = len(px_s) // 2
         customdata = np.full(len(px_s), level_pct)
 
@@ -227,8 +229,7 @@ def _add_efficiency_contours(
                 textfont=dict(size=10, color=color),
                 customdata=customdata,
                 hovertemplate="Eff: %{customdata:.0f}%<extra></extra>",
-                # Closed rings get a filled marker at the end to look tidy
-                name=f"η={level_pct:.0f}%{'  ⊙' if closed else ''}",
+                name=f"η={level_pct:.0f}%",
                 legendgroup="iso_eff",
                 legendgrouptitle_text="等效率线" if not shown_levels - {level_pct} else None,
                 showlegend=show_in_legend,
@@ -236,7 +237,6 @@ def _add_efficiency_contours(
             secondary_y=False,
         )
 
-    # BEP gold star
     fig.add_trace(
         go.Scatter(
             x=[bep_x], y=[bep_y],
@@ -250,7 +250,6 @@ def _add_efficiency_contours(
         ),
         secondary_y=False,
     )
-
     return fig
 
 
@@ -318,6 +317,7 @@ def create_performance_curve(
             fig, df, x_col=x_col, y_col=y1_col,
             eff_col="efficiency",
             contour_step_pct=eff_contour_step,
+            smooth_level=smooth_level,   # ← same slider as performance curves
         )
 
     fig.update_layout(
