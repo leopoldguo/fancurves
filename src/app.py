@@ -298,14 +298,22 @@ if uploaded_file:
         
         st.subheader("⚙️ 轴向力深度分析与安全预警")
         
+        # --- 真空度展示 ---
+        if not df.empty and "p_in_pa" in df.columns:
+            avg_p_in = df["p_in_pa"].mean()
+            if avg_p_in < 101000.0:
+                st.error(f"🌌 **真空/负压模式激活**：检测到数据集入口压力低于海平面。当前基准入口绝对压力约为 {avg_p_in:.0f} Pa")
+            else:
+                st.info(f"🌍 **标准环境模式**：当前基准入口绝对压力约为 {avg_p_in:.0f} Pa")
+        
         # 侧边栏参数表单
         st.sidebar.markdown("---")
         st.sidebar.subheader("几何与构型参数")
         
         p_ambient = st.sidebar.number_input(
-            "大气压 P_atm (Pa)", value=st.session_state.get("p_ambient_pa", 101325.0), 
+            "环境大气压 P_amb (Pa) (Absolute Pressure)", value=st.session_state.get("p_ambient_pa", 101325.0), 
             key="p_ambient_pa", on_change=save_pref, args=("p_ambient_pa",),
-            help="用于将表压转换为绝对压力基准，消除基准偏差，避免负压积分错误。"
+            help="针对真空泵应用，进口压力是决定轴向力绝对值的核心基准。若 CSV 未提供，系统将按标准海平面工况模拟。"
         )
         d_impeller = st.sidebar.number_input(
             "叶轮外径 D_imp (mm)", value=st.session_state.get("d_imp_mm", 500.0), 
@@ -377,12 +385,14 @@ if uploaded_file:
         else:
             def row_calc(row):
                 rpm = row['speed_rpm']
-                # 重新计算该行的独立参数，以避免依赖性能看板才生成的 display_pressure
-                p_out_gauge_pa = (row[pressure_raw_col] - 1.0) * 101325.0
-                p_in_gauge_pa = 0.0 # 假定入口处为常压（0 Gauge）
+                # 真空工况：直接从提取的真实物理数据获取绝对入口压力与温度
+                p_in_abs = row["p_in_pa"]
+                rho = row["rho"]
+                
+                # 基于气动压比真正推算出口绝对压力
+                p_out_abs = p_in_abs * row[pressure_raw_col]
                 
                 # 确定目标泄压
-                p_in_abs = p_in_gauge_pa + p_ambient
                 if hole_type == "叶轮盲孔 (内连通入口)":
                     p_target = p_in_abs
                 elif hole_type == "机壳穿孔 (外连通大气)":
@@ -392,9 +402,9 @@ if uploaded_file:
                 
                 f_bp = calculate_backplate_force(
                     rpm=rpm, 
-                    p_out_gauge_pa=p_out_gauge_pa, 
-                    p_in_gauge_pa=p_in_gauge_pa, 
-                    rho=1.204,
+                    p_out_abs_pa=p_out_abs, 
+                    p_in_abs_pa=p_in_abs, 
+                    rho=rho,
                     d_impeller_mm=d_impeller, 
                     d_shaft_mm=d_shaft,
                     has_seal2=has_seal2, 

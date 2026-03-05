@@ -2,8 +2,8 @@ import math
 
 def calculate_backplate_force(
     rpm: float, 
-    p_out_gauge_pa: float, 
-    p_in_gauge_pa: float, 
+    p_out_abs_pa: float, 
+    p_in_abs_pa: float, 
     rho: float,
     d_impeller_mm: float, 
     d_shaft_mm: float,
@@ -20,15 +20,14 @@ def calculate_backplate_force(
     """
     计算高速半开式离心风机背板所承受的气动轴向力 (N)。
     方向定义：指向入口为正（电机 -> 叶轮方向）。
-    由于 CSV 内记录的轴向力通常为绝对气压合成（甚至在无流量时也承载全大气压推力），
-    本函数统一将所有表压转为绝对压力 (P_abs) 再进行面积积分。
+    支持真空工况，所有输入必须为绝对压力 (P_abs)。
     """
     R_out = (d_impeller_mm / 2.0) / 1000.0
     R_in = (d_shaft_mm / 2.0) / 1000.0
     
-    # 转绝对压力
-    P_out_abs = p_out_gauge_pa + p_ambient_pa
-    P_in_abs = p_in_gauge_pa + p_ambient_pa
+    # 直接使用传入的绝对压力
+    P_out_abs = p_out_abs_pa
+    P_in_abs = p_in_abs_pa
     
     omega = rpm * (2.0 * math.pi / 60.0)
     omega_fluid = k_factor * omega

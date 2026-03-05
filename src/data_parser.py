@@ -7,6 +7,8 @@ HEADER_MAP = {
     "设定转速": "speed_rpm",
     "等熵效率": "efficiency_pct",   # CFX provides this directly (unit: %)
     "轴向力(N)": "axial_force",
+    "进口压力": "p_in_pa",
+    "进口温度": "t_in_c"
 }
 
 P_ATM_KPA       = 101.325    # kPa
@@ -33,6 +35,16 @@ def normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     if "axial_force" in df_clean.columns:
         # Invert axial force convention: make Motor -> Inlet positive
         df_clean["axial_force"] = -1 * df_clean["axial_force"]
+        
+    # 动态填补进口状态与密度
+    if "p_in_pa" not in df_clean.columns:
+        df_clean["p_in_pa"] = 101325.0
+    if "t_in_c" not in df_clean.columns:
+        df_clean["t_in_c"] = 20.0
+        
+    # 理想气体状态方程计算当前点密度: rho = P / (R * T)
+    # 取空气气体常数 R ≈ 287.058 J/(kg·K)
+    df_clean["rho"] = df_clean["p_in_pa"] / (287.058 * (df_clean["t_in_c"] + 273.15))
         
     return df_clean
 
