@@ -12,7 +12,24 @@ import json
 import os
 
 st.set_page_config(page_title="Fan Performance Dashboard", layout="wide")
-st.title("交互式风机性能曲线数据看板")
+
+st.markdown("""
+<style>
+    /* Industrial Theme CSS Injection */
+    .stMetricValue, .stNumberInput input, .stSlider div[role="slider"] {
+        font-family: 'Roboto Mono', 'Courier New', monospace !important;
+    }
+    /* Safety Orange for Sliders and Accents */
+    .stSlider div[data-baseweb="slider"] div {
+        background-color: #FF8C00 !important;
+    }
+    h1, h2, h3 {
+        color: #E0E0E0 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+st.title("🎛️ 交互式风机性能曲线数据看板 (Industrial)")
 
 PREFS_FILE = "user_prefs.json"
 
@@ -52,12 +69,14 @@ AIR_DENSITY_20C = 1.204
 st.sidebar.header("控制面板")
 uploaded_file = st.sidebar.file_uploader("上传 CFX 结果 (CSV)", type=["csv"])
 
-flow_unit = st.sidebar.selectbox(
+unit_card = st.sidebar.container(border=True)
+unit_card.subheader("单位设置")
+flow_unit = unit_card.selectbox(
     "流量单位", ["kg/s", "m3/h", "m3/min", "CFM"],
     help="体积流量均以 20°C、1 标准大气压（1.204 kg/m³）换算",
     key="flow_unit", on_change=save_pref, args=("flow_unit",)
 )
-pressure_display = st.sidebar.selectbox(
+pressure_display = unit_card.selectbox(
     "压力单位", ["压比 (PR)", "差压 (ΔkPa)", "绝对出口压力 (kPa abs)"],
     help="以标准大气压 101.325 kPa 为基准",
     key="pressure_display", on_change=save_pref, args=("pressure_display",)
@@ -197,11 +216,11 @@ if uploaded_file:
         (filtered_df["display_flow"] <= flow_range[1])
     )
     final_df = filtered_df.loc[mask]
-
-    # ─── 绘图 ─────────────────────────────────────────────────────────────────
-    st.subheader("性能曲线图")
+    # ─── 绘图容器 ──────────────────────────────────────────────────────────────
+    plot_container = st.container(border=True)
+    plot_container.subheader("📈 动态绘图主区")
     if final_df.empty:
-        st.warning("当前流量范围内没有数据，请调整X轴显示范围。")
+        plot_container.warning("当前流量范围内没有数据，请调整X轴显示范围。")
     else:
         fig = create_performance_curve(
             final_df, surge_line_df,
@@ -213,20 +232,23 @@ if uploaded_file:
             show_efficiency=show_efficiency,
             eff_contour_step=eff_contour_step,
         )
-        st.plotly_chart(fig, use_container_width=True)
+        plot_container.plotly_chart(fig, use_container_width=True)
+        plot_container.info("💡 鼠标悬停在图表右上角 → 相机图标 → 下载高清 PNG")
 
+    # ─── 统计容器 ──────────────────────────────────────────────────────────────
+        stat_container = st.container(border=True)
+        stat_container.subheader("📊 统计概览区")
+        
         if show_efficiency and has_efficiency and "efficiency" in final_df.columns:
             bep_row = final_df.loc[final_df["efficiency"].idxmax()]
-            col1, col2, col3, col4 = st.columns(4)
+            col1, col2, col3, col4 = stat_container.columns(4)
             col1.metric("🏆 BEP 效率", f"{bep_row['efficiency']*100:.1f}%")
             col2.metric(f"流量 (BEP)", f"{bep_row['display_flow']:.3f} {flow_unit}")
             col3.metric("压力 (BEP)", f"{bep_row['display_pressure']:.4f}")
             col4.metric("转速 (BEP)", f"{int(bep_row['speed_rpm'])} RPM")
-            st.caption(f"效率数据来源：{eff_source}")
+            stat_container.caption(f"效率数据来源：{eff_source}")
 
-        st.info("💡 鼠标悬停在图表右上角 → 相机图标 → 下载高清 PNG")
-
-        with st.expander("📋 查看当前渲染的数据表"):
+        with stat_container.expander("📋 查看当前渲染的数据表"):
             display_cols = ["speed_rpm", "display_flow", "display_pressure"]
             if power_col in final_df.columns: display_cols.append(power_col)
             if "efficiency" in final_df.columns: display_cols.append("efficiency")

@@ -219,11 +219,11 @@ def _add_efficiency_contours(fig, df, x_col, y_col,
         go.Scatter(
             x=[bep_x], y=[bep_y],
             mode="markers+text",
-            marker=dict(symbol="star", size=18, color="gold",
-                        line=dict(color="darkorange", width=1.5)),
+            marker=dict(symbol="star", size=18, color="#32CD32",
+                        line=dict(color="#32CD32", width=1.5)),
             text=[f"BEP {bep_pct:.1f}%"],
             textposition="top right",
-            textfont=dict(size=11, color="darkorange"),
+            textfont=dict(size=11, color="#32CD32"),
             name=f"BEP ({bep_pct:.1f}%)",
         ),
         secondary_y=False,
@@ -325,32 +325,31 @@ def create_performance_curve(
             fig, eff_df, x_col=x_col, y_col=y1_col,
             eff_col="efficiency",
             contour_step_pct=eff_contour_step,
-
             smooth_level=eff_smooth,
         )
 
     fig.update_layout(
         title_text="Fan Performance Map", title_font_size=18,
-        plot_bgcolor="white", paper_bgcolor="white",
+        plot_bgcolor="#1A1A1B", paper_bgcolor="#1A1A1B",
         hovermode="x unified",
-        font=dict(family="Arial, sans-serif", size=13),
-        legend=dict(orientation="v", bordercolor="lightgray",
-                    borderwidth=1, bgcolor="rgba(255,255,255,0.85)"),
+        font=dict(family="'Roboto Mono', monospace", size=13, color="#E0E0E0"),
+        legend=dict(orientation="v", bordercolor="#555555",
+                    borderwidth=1, bgcolor="rgba(26,26,27,0.85)"),
         margin=dict(l=80, r=80, t=80, b=60),
     )
     fig.update_xaxes(title_text=x_label,
-                     showgrid=True, gridcolor='rgba(200,200,200,0.5)',
-                     showline=True, linecolor='black', linewidth=1.5,
-                     ticks="outside", ticklen=6, mirror=True)
+                     showgrid=True, gridcolor='#333333',
+                     showline=True, linecolor='#555555', linewidth=1.5,
+                     ticks="outside", ticklen=6, tickcolor='#555555', mirror=True)
     fig.update_yaxes(title_text=y1_label, secondary_y=False,
-                     showgrid=True, gridcolor='rgba(200,200,200,0.5)',
-                     showline=True, linecolor='black', linewidth=1.5,
-                     ticks="outside", ticklen=6, mirror=False)
+                     showgrid=True, gridcolor='#333333',
+                     showline=True, linecolor='#555555', linewidth=1.5,
+                     ticks="outside", ticklen=6, tickcolor='#555555', mirror=False)
     fig.update_yaxes(title_text=y2_label if show_power else "",
                      secondary_y=True,
                      showgrid=False,
-                     showline=show_power, linecolor='gray',
+                     showline=show_power, linecolor='#555555',
                      ticks="outside" if show_power else "",
-                     ticklen=6,
+                     ticklen=6, tickcolor='#555555' if show_power else "rgba(0,0,0,0)",
                      showticklabels=show_power)
     return fig
