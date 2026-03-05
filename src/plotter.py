@@ -250,6 +250,7 @@ def create_performance_curve(
 ) -> go.Figure:
 
     fig = make_subplots(specs=[[{"secondary_y": True}]])
+    dense_eff_list = []
 
     if "speed_rpm" in df.columns:
         for speed in sorted(df["speed_rpm"].unique()):
@@ -258,6 +259,22 @@ def create_performance_curve(
             y1r = sd[y1_col].to_numpy(float)
 
             xs1, y1s = _smooth_series(xr, y1r, smooth_level=perf_smooth)
+            
+            if show_efficiency and "efficiency" in sd.columns:
+                er = sd["efficiency"].to_numpy(float)
+                try:
+                    fn_eff = interp1d(xr, er, kind='linear', fill_value="extrapolate")
+                    es1 = fn_eff(xs1)
+                    df_pts = pd.DataFrame({
+                        x_col: xs1,
+                        y1_col: y1s,
+                        "efficiency": es1,
+                        "speed_rpm": speed
+                    })
+                    dense_eff_list.append(df_pts)
+                except Exception:
+                    pass
+
             fig.add_trace(
                 go.Scatter(x=xs1, y=y1s, name=f'PR @ {int(speed)} RPM',
                            mode='lines', line=dict(width=2.5),
@@ -294,10 +311,15 @@ def create_performance_curve(
             secondary_y=False)
 
     if show_efficiency and "efficiency" in df.columns:
+        eff_df = df
+        if dense_eff_list:
+            eff_df = pd.concat(dense_eff_list, ignore_index=True)
+            
         fig = _add_efficiency_contours(
-            fig, df, x_col=x_col, y_col=y1_col,
+            fig, eff_df, x_col=x_col, y_col=y1_col,
             eff_col="efficiency",
             contour_step_pct=eff_contour_step,
+
             smooth_level=eff_smooth,
         )
 
