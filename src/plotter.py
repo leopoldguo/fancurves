@@ -47,9 +47,8 @@ def _is_closed_path(px, py, threshold=0.02):
 def _smooth_path(px, py, n_pts=_CONTOUR_PTS, smooth_level=5.0):
     """
     2-D parametric cubic spline for contour paths.
-    - Closed rings: per=True (seamless BEP ellipse).
-    - Open paths:  per=False (ends preserved exactly).
-    - Smoothing s uses same auto-scale formula as _smooth_series.
+    - Normalizes x and y to [0,1] to prevent massive aspect ratio differences
+      (e.g., m3/h vs Pressure Ratio) from distorting the splprep arc-length calculation.
     """
     if len(px) < 4:
         return px, py
@@ -60,8 +59,20 @@ def _smooth_path(px, py, n_pts=_CONTOUR_PTS, smooth_level=5.0):
 
     closed = _is_closed_path(px, py)
     n = len(px)
-    auto_s = (max(float(n)*float(np.var(px)), 1e-12) +
-              max(float(n)*float(np.var(py)), 1e-12)) / 2.0
+
+    # Normalize to [0, 1] to ensure x and y variance are on the same scale
+    px_min, px_max = px.min(), px.max()
+    py_min, py_max = py.min(), py.max()
+    px_range = max(px_max - px_min, 1e-12)
+    py_range = max(py_max - py_min, 1e-12)
+
+    px_norm = (px - px_min) / px_range
+    py_norm = (py - py_min) / py_range
+
+    # In normalized space, variance is ~0.08 max.
+    # auto_s scales with n and variance in normalized space.
+    auto_s = (max(float(n)*float(np.var(px_norm)), 1e-12) +
+              max(float(n)*float(np.var(py_norm)), 1e-12)) / 2.0
 
     if smooth_level <= 0.0:
         s = 0.0
@@ -71,9 +82,14 @@ def _smooth_path(px, py, n_pts=_CONTOUR_PTS, smooth_level=5.0):
 
     try:
         k = min(3, n - 1)
-        tck, _ = splprep([px, py], s=s, k=k, per=closed)
+        tck, _ = splprep([px_norm, py_norm], s=s, k=k, per=closed)
         u_fine = np.linspace(0., 1., n_pts)
-        xs, ys = splev(u_fine, tck)
+        xs_norm, ys_norm = splev(u_fine, tck)
+
+        # Scale back to original dimensions
+        xs = xs_norm * px_range + px_min
+        ys = ys_norm * py_range + py_min
+
         return np.array(xs), np.array(ys)
     except Exception:
         return px, py
