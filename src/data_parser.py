@@ -22,3 +22,25 @@ def normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
                 break
                 
     return df_clean.rename(columns=rename_dict)
+
+def convert_flow_units(value: float, from_unit: str, to_unit: str, density: float = 1.225) -> float:
+    """在 kg/s, m3/min 和 CFM 之间转换流量单位。"""
+    if from_unit == to_unit:
+        return value
+        
+    # 首先将所有单位转换为 m3/min 作为基准
+    m3_min = value
+    if from_unit == "kg/s":
+        m3_min = (value / density) * 60.0
+    elif from_unit == "CFM":
+        m3_min = value / 35.3146667
+        
+    # 从基准单位转换到目标单位
+    if to_unit == "m3/min":
+        return m3_min
+    elif to_unit == "kg/s":
+        return (m3_min / 60.0) * density
+    elif to_unit == "CFM":
+        return m3_min * 35.3146667
+        
+    raise ValueError(f"不支持的单位转换: {from_unit} 到 {to_unit}")
