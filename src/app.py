@@ -8,8 +8,43 @@ from data_parser import (
 )
 from plotter import create_performance_curve
 
+import json
+import os
+
 st.set_page_config(page_title="Fan Performance Dashboard", layout="wide")
 st.title("交互式风机性能曲线数据看板")
+
+PREFS_FILE = "user_prefs.json"
+
+def load_prefs():
+    if os.path.exists(PREFS_FILE):
+        try:
+            with open(PREFS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            return {}
+    return {}
+
+def save_pref(key):
+    prefs = load_prefs()
+    prefs[key] = st.session_state[key]
+    with open(PREFS_FILE, "w", encoding="utf-8") as f:
+        json.dump(prefs, f)
+
+if "prefs_loaded" not in st.session_state:
+    prefs = load_prefs()
+    defaults = {
+        "flow_unit": "kg/s",
+        "pressure_display": "压比 (PR)",
+        "show_power": True
+    }
+    for k, v in defaults.items():
+        if k not in prefs:
+            prefs[k] = v
+            
+    for k, v in prefs.items():
+        st.session_state[k] = v
+    st.session_state["prefs_loaded"] = True
 
 AIR_DENSITY_20C = 1.204
 
@@ -19,11 +54,13 @@ uploaded_file = st.sidebar.file_uploader("上传 CFX 结果 (CSV)", type=["csv"]
 
 flow_unit = st.sidebar.selectbox(
     "流量单位", ["kg/s", "m3/h", "m3/min", "CFM"],
-    help="体积流量均以 20°C、1 标准大气压（1.204 kg/m³）换算"
+    help="体积流量均以 20°C、1 标准大气压（1.204 kg/m³）换算",
+    key="flow_unit", on_change=save_pref, args=("flow_unit",)
 )
 pressure_display = st.sidebar.selectbox(
     "压力单位", ["压比 (PR)", "差压 (ΔkPa)", "绝对出口压力 (kPa abs)"],
-    help="以标准大气压 101.325 kPa 为基准"
+    help="以标准大气压 101.325 kPa 为基准",
+    key="pressure_display", on_change=save_pref, args=("pressure_display",)
 )
 
 PRESSURE_MODE_MAP  = {"压比 (PR)": "pressure_ratio", "差压 (ΔkPa)": "delta_kPa", "绝对出口压力 (kPa abs)": "abs_kPa"}
@@ -70,9 +107,13 @@ if uploaded_file:
     st.sidebar.subheader("数据过滤阈值")
     min_pr_val = float(df[pressure_raw_col].min())
     max_pr_val = float(df[pressure_raw_col].max())
+    
+    if "min_pr_threshold" not in st.session_state or not (1.0 <= st.session_state.min_pr_threshold <= max_pr_val):
+        st.session_state.min_pr_threshold = float(min_pr_val)
+
     min_pr_threshold = st.sidebar.number_input(
         "最低压比阈值", min_value=1.0, max_value=float(max_pr_val),
-        value=float(min_pr_val), step=0.01, format="%.4f"
+        step=0.01, format="%.4f", key="min_pr_threshold", on_change=save_pref, args=("min_pr_threshold",)
     )
     max_power_threshold = None
     if power_col in df.columns:
@@ -114,7 +155,7 @@ if uploaded_file:
     # ─── 显示选项 ─────────────────────────────────────────────────────────────
     st.sidebar.markdown("---")
     st.sidebar.subheader("显示选项")
-    show_power = st.sidebar.checkbox("显示功率曲线", value=True)
+    show_power = st.sidebar.checkbox("显示功率曲线", key="show_power", on_change=save_pref, args=("show_power",))
 
     show_efficiency  = False
     eff_contour_step = 2.0
