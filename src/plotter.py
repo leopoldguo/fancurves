@@ -233,6 +233,8 @@ def _add_efficiency_contours(fig, df, x_col, y_col,
 
 # ─── Main chart function ──────────────────────────────────────────────────────
 
+import plotly.colors as pc
+
 def create_performance_curve(
     df: pd.DataFrame,
     surge_line_df: pd.DataFrame,
@@ -251,9 +253,13 @@ def create_performance_curve(
 
     fig = make_subplots(specs=[[{"secondary_y": True}]])
     dense_eff_list = []
+    
+    colors = pc.qualitative.Plotly
 
     if "speed_rpm" in df.columns:
-        for speed in sorted(df["speed_rpm"].unique()):
+        for i, speed in enumerate(sorted(df["speed_rpm"].unique())):
+            color = colors[i % len(colors)]
+            
             sd = df[df["speed_rpm"] == speed].sort_values(by=x_col)
             xr  = sd[x_col].to_numpy(float)
             y1r = sd[y1_col].to_numpy(float)
@@ -277,12 +283,12 @@ def create_performance_curve(
 
             fig.add_trace(
                 go.Scatter(x=xs1, y=y1s, name=f'PR @ {int(speed)} RPM',
-                           mode='lines', line=dict(width=2.5),
+                           mode='lines', line=dict(color=color, width=2.5),
                            legendgroup=str(speed)),
                 secondary_y=False)
             fig.add_trace(
                 go.Scatter(x=xr, y=y1r, mode='markers',
-                           marker=dict(size=5, opacity=0.4, symbol='circle'),
+                           marker=dict(color=color, size=5, opacity=0.4, symbol='circle'),
                            legendgroup=str(speed), showlegend=False, hoverinfo='skip'),
                 secondary_y=False)
 
@@ -291,12 +297,12 @@ def create_performance_curve(
                 xs2, y2s = _smooth_series(xr, y2r, smooth_level=perf_smooth)
                 fig.add_trace(
                     go.Scatter(x=xs2, y=y2s, name=f'Power @ {int(speed)} RPM',
-                               mode='lines', line=dict(dash='dash', width=2),
+                               mode='lines', line=dict(color=color, dash='dash', width=2),
                                legendgroup=str(speed)),
                     secondary_y=True)
                 fig.add_trace(
                     go.Scatter(x=xr, y=y2r, mode='markers',
-                               marker=dict(size=5, opacity=0.4, symbol='diamond'),
+                               marker=dict(color=color, size=5, opacity=0.4, symbol='diamond'),
                                legendgroup=str(speed), showlegend=False, hoverinfo='skip'),
                     secondary_y=True)
 
