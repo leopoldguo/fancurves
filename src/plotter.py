@@ -158,10 +158,26 @@ def _add_efficiency_contours(fig, df, x_col, y_col,
     bep_y   = float(yd[bep_i])
     bep_pct = float(ed[bep_i]) * 100.0
 
-    xi = np.linspace(xd.min(), xd.max(), grid_n)
-    yi = np.linspace(yd.min(), yd.max(), grid_n)
-    XI, YI = np.meshgrid(xi, yi)
-    EI = griddata((xd, yd), ed * 100.0, (XI, YI), method="linear")
+    # Normalize X and Y to [0, 1] before griddata triangulation. 
+    # griddata uses Euclidean distance; large unit scales (like m3/h) distort the mesh.
+    xd_min, xd_max = xd.min(), xd.max()
+    yd_min, yd_max = yd.min(), yd.max()
+    xd_range = max(xd_max - xd_min, 1e-12)
+    yd_range = max(yd_max - yd_min, 1e-12)
+    
+    xd_norm = (xd - xd_min) / xd_range
+    yd_norm = (yd - yd_min) / yd_range
+
+    xi = np.linspace(xd_min, xd_max, grid_n)
+    yi = np.linspace(yd_min, yd_max, grid_n)
+    
+    xi_norm = (xi - xd_min) / xd_range
+    yi_norm = (yi - yd_min) / yd_range
+    
+    XI_NORM, YI_NORM = np.meshgrid(xi_norm, yi_norm)
+    EI = griddata((xd_norm, yd_norm), ed * 100.0, (XI_NORM, YI_NORM), method="linear")
+    
+    # Masking uses the original scale xi, yi
     EI = _mask_below_min_speed(EI, xi, yi, df, x_col, y_col)
 
     step  = contour_step_pct
