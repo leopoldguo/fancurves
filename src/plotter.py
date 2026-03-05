@@ -69,16 +69,13 @@ def _smooth_path(px, py, n_pts=_CONTOUR_PTS, smooth_level=5.0):
     px_norm = (px - px_min) / px_range
     py_norm = (py - py_min) / py_range
 
-    # In normalized space, variance is ~0.08 max.
-    # auto_s scales with n and variance in normalized space.
-    auto_s = (max(float(n)*float(np.var(px_norm)), 1e-12) +
-              max(float(n)*float(np.var(py_norm)), 1e-12)) / 2.0
-
-    if smooth_level <= 0.0:
-        s = 0.0
-    else:
-        multiplier = 0.01 * smooth_level
-        s = auto_s * multiplier
+    # The contour data is already noise-free (just jagged due to grid resolution).
+    # We want to bound the average deviation. User controls max average deviation
+    # from 0% to 1% of the bounding box size.
+    # e = target average error = 0.001 * smooth_level (At level 10, e = 0.01 = 1%)
+    # s = sum of squared errors = n * e^2
+    target_err_norm = 0.001 * float(smooth_level)
+    s = float(n) * (target_err_norm ** 2)
 
     try:
         k = min(3, n - 1)
