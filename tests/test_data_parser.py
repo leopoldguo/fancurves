@@ -38,7 +38,7 @@ def test_filter_operating_points_with_interpolation():
     # Flow should be halfway between 10 and 20 -> 15.0
     # Power should be halfway between 100 and 200 -> 150.0
     
-    filtered_df, surge_line_df = filter_operating_points(df, flow_col="display_flow", pressure_col="pressure_ratio", min_pressure=1.1)
+    filtered_df, surge_line_df, _ = filter_operating_points(df, flow_col="display_flow", pressure_col="pressure_ratio", min_pressure=1.1)
     
     # Should have p=1.2 (inside) and p=1.1 (interpolated)
     assert len(filtered_df) == 2
@@ -67,7 +67,7 @@ def test_filter_operating_points_with_surge_interpolation():
         "pressure_ratio": [1.0, 2.0, 2.0, 1.0] 
     })
     
-    filtered_df, surge_line_df = filter_operating_points(op_df, flow_col="display_flow", pressure_col="pressure_ratio", min_pressure=0.0)
+    filtered_df, surge_line_df, _ = filter_operating_points(op_df, flow_col="display_flow", pressure_col="pressure_ratio", min_pressure=0.0)
     
     speed_1500 = filtered_df[filtered_df["speed_rpm"] == 1500]
     assert len(speed_1500) == 2

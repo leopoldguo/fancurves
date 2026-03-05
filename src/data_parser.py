@@ -118,6 +118,7 @@ def filter_operating_points(
 
     surge_points = []
     truncated_rows = []
+    peak_info = {}
     
     # Pre-process: truncation and anchor points
     for speed in sorted(df["speed_rpm"].unique()):
@@ -125,10 +126,15 @@ def filter_operating_points(
         if len(speed_df) == 0:
             continue
             
+        # Ensure numeric for accurate max finding
+        speed_df[pressure_col] = pd.to_numeric(speed_df[pressure_col], errors='coerce')
+        
         # Find the point of maximum pressure
         max_p_idx = speed_df[pressure_col].idxmax()
-        max_p_val = speed_df.loc[max_p_idx, pressure_col]
-        max_p_flow = speed_df.loc[max_p_idx, flow_col]
+        max_p_val = float(speed_df.loc[max_p_idx, pressure_col])
+        max_p_flow = float(speed_df.loc[max_p_idx, flow_col])
+        
+        peak_info[speed] = {"flow": max_p_flow, "pressure": max_p_val}
         
         # Discard points to the left of the maximum pressure peak (where pressure dropped)
         speed_df_valid = speed_df[speed_df[flow_col] >= max_p_flow]
@@ -271,4 +277,4 @@ def filter_operating_points(
         pressure_col: [surge_df.iloc[0][pressure_col], surge_df.iloc[-1][pressure_col]]
     }) if m_surge is not None else pd.DataFrame()
 
-    return result_df, surge_line_df
+    return result_df, surge_line_df, peak_info

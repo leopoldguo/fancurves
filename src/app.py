@@ -87,12 +87,18 @@ if uploaded_file:
             )
 
     # ─── 过滤计算 ─────────────────────────────────────────────────────────────
-    filtered_df, surge_line_df = filter_operating_points(
+    filtered_df, surge_line_df, peak_info = filter_operating_points(
         df, flow_col="display_flow", pressure_col=pressure_raw_col,
         min_pressure=min_pr_threshold, max_power=max_power_threshold, power_col=power_col
     )
     if filtered_df.empty:
         st.warning("所有数据均被过滤条件剔除，请放宽阈值。"); st.stop()
+
+    with st.sidebar.expander("自动边界截断与喘振点诊断", expanded=False):
+        st.markdown("**检测到的真实数据最高压力点 (截断基准):**")
+        for spd, info in peak_info.items():
+            st.text(f"{spd} RPM: 取最大值 PR={info['pressure']:.4f} @ Flow={info['flow']:.4f}")
+        st.markdown("*注：系统自动舍去了流量小于最高压力点的所有「压降」散点数据。图表中曲线在最高压力点左侧的下垂，通常是由于插值算法(Spline)在平滑连接时的视觉过冲导致，并非真实残留数据。*")
 
     # 压力单位换算（显示层）
     filtered_df = filtered_df.copy()
