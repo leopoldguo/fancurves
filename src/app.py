@@ -203,13 +203,13 @@ if uploaded_file:
         
         def row_pressure_display(row, mode):
             pr = row[pressure_raw_col]
-            p_in = row["p_in_pa"]  # 真实入口绝对压力 (Pa)
+            p_in = row.get("p_in_pa", 101325.0)  # 安全读取，缺列时回退至标准大气压
             if mode == "delta_kPa":
-                return (pr - 1.0) * (p_in / 1000.0)  # 差压 = (PR-1) * P_in
+                return (pr - 1.0) * (p_in / 1000.0)
             elif mode == "abs_kPa":
-                return pr * (p_in / 1000.0)           # 出口绝压 = PR * P_in
+                return pr * (p_in / 1000.0)
             else:
-                return pr                              # 纯压比无需修正
+                return pr
 
         filtered_df["display_pressure"] = filtered_df.apply(
             lambda row: row_pressure_display(row, pressure_mode), axis=1
