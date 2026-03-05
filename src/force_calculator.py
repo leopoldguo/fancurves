@@ -2,74 +2,88 @@ import math
 
 def calculate_backplate_force(
     rpm: float, 
-    p_out_pa: float, 
-    p_in_pa: float, 
+    p_out_gauge_pa: float, 
+    p_in_gauge_pa: float, 
     rho: float,
     d_impeller_mm: float, 
     d_shaft_mm: float,
-    has_seal: bool = False, 
-    d_seal_mm: float = 0.0,
-    has_impeller_holes: bool = False, 
-    n_impeller_holes: int = 0, 
-    d_impeller_holes_mm: float = 0.0,
-    has_backplate_holes: bool = False, 
-    n_backplate_holes: int = 0, 
-    d_backplate_holes_mm: float = 0.0,
+    has_seal2: bool = False, 
+    d_seal2_mm: float = 0.0,
+    has_balance_holes: bool = False, 
+    d_hole_mm: float = 0.0,
+    a_hole_cm2: float = 0.0,
+    alpha: float = 0.3,
     p_ambient_pa: float = 101325.0,
-    k_factor: float = 0.5
+    k_factor: float = 0.15
 ) -> float:
     """
-    计算高速离心风机背板所承受的气动轴向力 (N)。
+    计算高速半开式离心风机背板所承受的气动轴向力 (N)。
     方向定义：指向入口为正（电机 -> 叶轮方向）。
-    
-    采用解析积分求解：
-    P(r) = P_out - 0.5 * rho * (k*omega)^2 * (R_out^2 - r^2)
-    F = integral( P(r) * 2 * pi * r ) dr
-    
-    平衡孔影响：
-    粗略模型下，如果有平衡孔，对应密封腔内的基准压力会被强制拉低。
-    如果有叶轮平衡孔，内腔压力近似于 P_in。
-    如果有背板平衡孔，内腔压力近似于 P_ambient。
-    如果都没有，压力按标准旋转流体分布。
+    由于 CSV 内记录的轴向力通常为绝对气压合成（甚至在无流量时也承载全大气压推力），
+    本函数统一将所有表压转为绝对压力 (P_abs) 再进行面积积分。
     """
     R_out = (d_impeller_mm / 2.0) / 1000.0
-    R_shaft = (d_shaft_mm / 2.0) / 1000.0
+    R_in = (d_shaft_mm / 2.0) / 1000.0
     
-    if has_seal and d_seal_mm > 0:
-        R_inner = (d_seal_mm / 2.0) / 1000.0
-    else:
-        R_inner = R_shaft
-        
+    # 转绝对压力
+    P_out_abs = p_out_gauge_pa + p_ambient_pa
+    P_in_abs = p_in_gauge_pa + p_ambient_pa
+    
     omega = rpm * (2.0 * math.pi / 60.0)
     omega_fluid = k_factor * omega
     
-    # 解析积分公式:
-    # F = \pi * (R_out^2 - r_inner^2) * (P_out - 0.5 * rho * omega_fluid^2 * R_out^2)
-    #     + 0.25 * \pi * rho * omega_fluid^2 * (R_out^4 - r_inner^4)
-    term1_pressure_const = p_out_pa - 0.5 * rho * (omega_fluid**2) * (R_out**2)
-    force_main_area = math.pi * (R_out**2 - R_inner**2) * term1_pressure_const \
-                      + 0.25 * math.pi * rho * (omega_fluid**2) * (R_out**4 - R_inner**4)
-                      
-    force_inner_cavity = 0.0
-    if has_seal and R_inner > R_shaft:
-        # 有密封时，密封环内侧到轴之间的面积，承受内腔压力
-        cavity_area = math.pi * (R_inner**2 - R_shaft**2)
-        if has_impeller_holes:
-            p_cavity = p_in_pa
-        elif has_backplate_holes:
-            p_cavity = p_ambient_pa
-        else:
-            # 无平衡孔且有密封时，内腔压力近似为流体到达密封处的边界压力减去微小泄漏损失，这里取密封边界处的压力
-            p_cavity = p_out_pa - 0.5 * rho * (omega_fluid**2) * (R_out**2 - R_inner**2)
-            
-        force_inner_cavity = p_cavity * cavity_area
+    # 确定第二道密封的位置 (R_s2)
+    R_s2 = (d_seal2_mm / 2.0) / 1000.0 if (has_seal2 and d_seal2_mm > 0) else R_in
+    if R_s2 > R_out: R_s2 = R_out
+    if R_s2 < R_in:  R_s2 = R_in
+    
+    # --- 区域1: R_s2 到 R_out (外环主流区，背压直接受出口控制) ---
+    # P(r) = P_out_abs - 0.5 * rho * (omega_fluid)^2 * (R_out^2 - r^2)
+    term_1_const = P_out_abs - 0.5 * rho * (omega_fluid**2) * (R_out**2)
+    F1 = math.pi * (R_out**2 - R_s2**2) * term_1_const \
+         + 0.25 * math.pi * rho * (omega_fluid**2) * (R_out**4 - R_s2**4)
+         
+    # 区域1边界（即密封外侧）的流体压力
+    P_at_Rs2 = P_out_abs - 0.5 * rho * (omega_fluid**2) * (R_out**2 - R_s2**2)
+    
+    # --- 区域2: R_in 到 R_s2 (带有平衡孔衰减的内腔区) ---
+    F2 = 0.0
+    if R_s2 > R_in:
+        # 默认无孔时的自然衰减抛物线尽头：
+        P_root_theoretical = P_at_Rs2 - 0.5 * rho * (omega_fluid**2) * (R_s2**2 - R_in**2)
+        P_root_actual = P_root_theoretical
         
-    total_backplate_force = force_main_area + force_inner_cavity
+        # 若有平衡孔，按孔所在圆周处的理论压力进行阻力折减
+        if has_balance_holes and a_hole_cm2 > 0 and d_hole_mm > 0:
+            R_hole = (d_hole_mm / 2.0) / 1000.0
+            # 限制孔位置在腔体内
+            if R_hole > R_s2: R_hole = R_s2
+            if R_hole < R_in: R_hole = R_in
+            
+            # 计算该圆周处的理论未泄压压力
+            P_hole_theoretical = P_at_Rs2 - 0.5 * rho * (omega_fluid**2) * (R_s2**2 - R_hole**2)
+            
+            # 使用泄压系数逼进入口压力
+            relief_ratio = min(1.0, alpha * (a_hole_cm2 / 10.0))
+            P_hole_actual = P_hole_theoretical - relief_ratio * (P_hole_theoretical - P_in_abs)
+            
+            # 锚定此处的实际压力后，再向下推演到根部的压力
+            P_root_actual = P_hole_actual - 0.5 * rho * (omega_fluid**2) * (R_hole**2 - R_in**2)
+            
+        # 根据重置的根部压力 P_root_actual 重新积分此区间
+        term_2_const = P_root_actual - 0.5 * rho * (omega_fluid**2) * (R_in**2)
+        F2 = math.pi * (R_s2**2 - R_in**2) * term_2_const \
+             + 0.25 * math.pi * rho * (omega_fluid**2) * (R_s2**4 - R_in**4)
+             
+    # --- 大气环境背板外侧推力 ---
+    # 大气压作用在背板非气动测，反推向叶轮侧，方向为负。
+    F_ambient_back = - (math.pi * (R_out**2 - R_in**2) * p_ambient_pa)
+    
+    total_backplate_force = F1 + F2 + F_ambient_back
     return total_backplate_force
 
 def calculate_total_axial_force(force_blade_and_hub_n: float, force_backplate_n: float) -> float:
     """
-    F_total = F_backplate - F_blade_hub
-    正值表示合力推向入口。
+    总轴向合力: 注意力系方向已在解析层面约定
     """
     return force_backplate_n - force_blade_and_hub_n

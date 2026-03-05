@@ -325,22 +325,65 @@ if uploaded_file:
         st.sidebar.markdown("---")
         st.sidebar.subheader("几何与构型参数")
         
-        d_impeller = st.sidebar.number_input("叶轮外径 D_imp (mm)", value=st.session_state.get("d_imp_mm", 500.0), key="d_imp_mm", on_change=save_pref, args=("d_imp_mm",))
-        d_shaft = st.sidebar.number_input("轴径 D_shaft (mm)", value=st.session_state.get("d_shaft_mm", 100.0), key="d_shaft_mm", on_change=save_pref, args=("d_shaft_mm",))
+        p_ambient = st.sidebar.number_input(
+            "大气压 P_atm (Pa)", value=st.session_state.get("p_ambient_pa", 101325.0), 
+            key="p_ambient_pa", on_change=save_pref, args=("p_ambient_pa",),
+            help="用于将表压转换为绝对压力基准，消除基准偏差，避免负压积分错误。"
+        )
+        d_impeller = st.sidebar.number_input(
+            "叶轮外径 D_imp (mm)", value=st.session_state.get("d_imp_mm", 500.0), 
+            key="d_imp_mm", on_change=save_pref, args=("d_imp_mm",)
+        )
+        d_shaft = st.sidebar.number_input(
+            "主轴直径 D_in (mm)", value=st.session_state.get("d_shaft_mm", 100.0), 
+            key="d_shaft_mm", on_change=save_pref, args=("d_shaft_mm",),
+            help="默认的内侧轴封位置边界。"
+        )
         
-        has_seal = st.sidebar.checkbox("具备背板密封", value=st.session_state.get("has_seal", False), key="has_seal", on_change=save_pref, args=("has_seal",))
-        d_seal = 0.0
-        if has_seal:
-            d_seal = st.sidebar.number_input("密封直径 D_seal (mm)", value=st.session_state.get("d_seal_mm", 120.0), key="d_seal_mm", on_change=save_pref, args=("d_seal_mm",))
+        has_seal2 = st.sidebar.checkbox(
+            "启用第2道密封 (背板外侧)", value=st.session_state.get("has_seal2", False), 
+            key="has_seal2", on_change=save_pref, args=("has_seal2",)
+        )
+        d_seal2 = 0.0
+        if has_seal2:
+            d_seal2 = st.sidebar.number_input(
+                "第2道密封直径 D_s2 (mm)", value=st.session_state.get("d_seal2_mm", 300.0), 
+                key="d_seal2_mm", on_change=save_pref, args=("d_seal2_mm",),
+                help="位于背板外侧的辅助密封，切断高压区，显著改变压力积分区间。"
+            )
             
-        has_imp_holes = st.sidebar.checkbox("叶轮平衡孔", value=st.session_state.get("has_impeller_holes", False), key="has_impeller_holes", on_change=save_pref, args=("has_impeller_holes",))
-        has_bp_holes = st.sidebar.checkbox("背板平衡孔 (连通大气)", value=st.session_state.get("has_backplate_holes", False), key="has_backplate_holes", on_change=save_pref, args=("has_backplate_holes",))
+        has_bp_holes = st.sidebar.checkbox(
+            "开启平衡孔泄压", value=st.session_state.get("has_balance_holes", False), 
+            key="has_balance_holes", on_change=save_pref, args=("has_balance_holes",)
+        )
         
-        p_ambient = 101325.0
+        d_hole = 0.0
+        a_hole = 0.0
+        alpha_hole = 0.3
+        k_factor = 0.15
+        
         if has_bp_holes:
-            p_ambient = st.sidebar.number_input("外部大气压 P_amb (Pa)", value=st.session_state.get("p_ambient_pa", 101325.0), key="p_ambient_pa", on_change=save_pref, args=("p_ambient_pa",))
+            d_hole = st.sidebar.number_input(
+                "平衡孔分布直径 D_hole (mm)", value=st.session_state.get("d_hole_mm", 200.0), 
+                key="d_hole_mm", on_change=save_pref, args=("d_hole_mm",),
+                help="平衡孔所在圆周的直径。该处的压力会被泄压拉低，进而影响整个内腔的压力梯级基准。"
+            )
+            a_hole = st.sidebar.number_input(
+                "平衡孔总面积 A_hole (cm²)", value=st.session_state.get("a_hole_cm2", 15.0), 
+                key="a_hole_cm2", on_change=save_pref, args=("a_hole_cm2",),
+                help="影响泄压效果的关键几何参数，面积越大内腔压力越趋近于入口压力，直接决定合力方向。"
+            )
+            alpha_hole = st.sidebar.slider(
+                "泄压系数 α", min_value=0.0, max_value=1.0, value=st.session_state.get("alpha_hole", 0.3), step=0.05,
+                key="alpha_hole", on_change=save_pref, args=("alpha_hole",),
+                help="反映平衡孔流动阻力与压力平衡能力的工程修正值。"
+            )
             
-        bp_gap = st.sidebar.number_input("背板间隙 b_b (mm)", value=st.session_state.get("bp_gap_mm", 1.0), key="bp_gap_mm", on_change=save_pref, args=("bp_gap_mm",))
+        k_factor = st.sidebar.slider(
+            "流体旋转因子 k", min_value=0.0, max_value=1.0, value=st.session_state.get("k_factor", 0.15), step=0.05,
+            key="k_factor", on_change=save_pref, args=("k_factor",),
+            help="背板腔体流体角速度与叶轮角速度之比，决定径向压力下降梯度。"
+        )
         
         st.sidebar.markdown("---")
         st.sidebar.subheader("安全与报警界限")
@@ -351,16 +394,27 @@ if uploaded_file:
         else:
             def row_calc(row):
                 rpm = row['speed_rpm']
-                p_out_pa = row['pressure_ratio'] * 101325.0
-                p_in_pa = 101325.0
+                # Data Parser 导入进来的 pressure_ratio 目前代表压比或者压力(kPa)，这里我们需要明确获取压强差(kPa)。
+                # 为确保单位为 Pa，且是 gauge 压强，需要明确用户的输入来源。
+                # 假设 df["display_pressure"] 是显示压强，若是 kPa 则 *1000：
+                p_out_gauge_pa = row["display_pressure"] * 1000.0 if "kPa" in y1_label else row['pressure_ratio'] * 101325.0
+                p_in_gauge_pa = 0.0 # 假定入口处为常压（0 Gauge）
                 
                 f_bp = calculate_backplate_force(
-                    rpm=rpm, p_out_pa=p_out_pa, p_in_pa=p_in_pa, rho=1.204,
-                    d_impeller_mm=d_impeller, d_shaft_mm=d_shaft,
-                    has_seal=has_seal, d_seal_mm=d_seal,
-                    has_impeller_holes=has_imp_holes,
-                    has_backplate_holes=has_bp_holes,
-                    p_ambient_pa=p_ambient, k_factor=0.5
+                    rpm=rpm, 
+                    p_out_gauge_pa=p_out_gauge_pa, 
+                    p_in_gauge_pa=p_in_gauge_pa, 
+                    rho=1.204,
+                    d_impeller_mm=d_impeller, 
+                    d_shaft_mm=d_shaft,
+                    has_seal2=has_seal2, 
+                    d_seal2_mm=d_seal2,
+                    has_balance_holes=has_bp_holes,
+                    d_hole_mm=d_hole,
+                    a_hole_cm2=a_hole,
+                    alpha=alpha_hole,
+                    p_ambient_pa=p_ambient, 
+                    k_factor=k_factor
                 )
                 
                 f_blade = row["axial_force"]
