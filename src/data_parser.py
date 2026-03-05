@@ -7,7 +7,9 @@ HEADER_MAP = {
     "设定转速": "speed_rpm"
 }
 
-P_ATM_KPA = 101.325  # 标准大气压，单位 kPa
+P_ATM_KPA   = 101.325   # kPa
+P_ATM_PA    = 101325.0  # Pa
+AIR_DENSITY_20C = 1.204 # kg/m³ at 20°C, 1 atm
 
 def normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     """将 CFX CSV 的中文表头标准化为内部统一的英文键。"""
@@ -21,7 +23,7 @@ def normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
                 break
     return df_clean.rename(columns=rename_dict)
 
-def convert_flow_units(value: float, from_unit: str, to_unit: str, density: float = 1.204) -> float:
+def convert_flow_units(value: float, from_unit: str, to_unit: str, density: float = AIR_DENSITY_20C) -> float:
     """在 kg/s, m3/min, m3/h, CFM 之间转换流量单位。
     密度默认使用 20°C、1标准大气压的空气密度 1.204 kg/m³。
     """
@@ -35,7 +37,7 @@ def convert_flow_units(value: float, from_unit: str, to_unit: str, density: floa
         m3_min = value / 35.3146667
     elif from_unit == "m3/h":
         m3_min = value / 60.0
-    # m3/min: no conversion needed, m3_min = value already
+    # m3/min: no conversion needed
 
     if to_unit == "m3/min":
         return m3_min
@@ -60,6 +62,24 @@ def convert_pressure_ratio_to_kpa(pressure_ratio_series: pd.Series, mode: str) -
         return pressure_ratio_series * P_ATM_KPA
     else:
         return pressure_ratio_series  # pressure_ratio, no change
+
+def compute_efficiency(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Compute fan total pressure efficiency for each row:
+        η = Q [m³/s] × ΔP [Pa] / P_shaft [W]
+
+    Requires columns: mass_flow (kg/s), pressure_ratio (-), shaft_power (kW).
+    Adds column 'efficiency' clipped to [0, 1].
+    """
+    result = df.copy()
+    try:
+        Q  = result["mass_flow"] / AIR_DENSITY_20C           # m³/s
+        dP = (result["pressure_ratio"] - 1.0) * P_ATM_PA     # Pa
+        W  = result["shaft_power"] * 1000.0                   # W
+        result["efficiency"] = (Q * dP / W).clip(0, 1)
+    except KeyError:
+        result["efficiency"] = float("nan")
+    return result
 
 def filter_operating_points(
     df: pd.DataFrame,
