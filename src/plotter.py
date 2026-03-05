@@ -353,3 +353,58 @@ def create_performance_curve(
                      ticklen=6, tickcolor='#555555' if show_power else "rgba(0,0,0,0)",
                      showticklabels=show_power)
     return fig
+
+def create_axial_force_curve(df: pd.DataFrame, x_col: str, force_col: str, max_bearing_load: float, flow_unit: str) -> go.Figure:
+    """绘制轴向力曲线并添加安全承载报警线。"""
+    fig = go.Figure()
+    
+    unique_speeds = sorted(df["speed_rpm"].unique(), reverse=True)
+    palette = ["#FF3B30", "#FF9500", "#FFCC00", "#4CD964", "#5AC8FA", "#007AFF", "#AF52DE", "#FF2D55"]
+    
+    for i, speed in enumerate(unique_speeds):
+        speed_df = df[df["speed_rpm"] == speed].sort_values(x_col)
+        color = palette[i % len(palette)]
+        
+        fig.add_trace(go.Scatter(
+            x=speed_df[x_col], y=speed_df[force_col],
+            mode='lines+markers',
+            name=f"{int(speed)} RPM",
+            line=dict(color=color, width=2.5),
+            marker=dict(size=6, symbol='circle')
+        ))
+        
+    # 添加安全报警线
+    fig.add_hline(y=max_bearing_load, line_dash="dash", line_color="#FF3B30",
+                  annotation_text="最大正向极限载荷", annotation_position="top right", annotation_font_color="#FF3B30")
+    fig.add_hline(y=-max_bearing_load, line_dash="dash", line_color="#FF3B30",
+                  annotation_text="最大反向极限载荷", annotation_position="bottom right", annotation_font_color="#FF3B30")
+    fig.add_hline(y=0, line_color="#555555", line_width=1)
+    
+    # 将超出极限的区域涂红
+    max_flow = df[x_col].max() * 1.05
+    min_flow = df[x_col].min() * 0.95
+    fig.add_shape(type="rect",
+                  x0=min_flow, y0=max_bearing_load, x1=max_flow, y1=max_bearing_load*1.5,
+                  fillcolor="rgba(255, 59, 48, 0.1)", line_width=0, layer="below")
+    fig.add_shape(type="rect",
+                  x0=min_flow, y0=-max_bearing_load, x1=max_flow, y1=-max_bearing_load*1.5,
+                  fillcolor="rgba(255, 59, 48, 0.1)", line_width=0, layer="below")
+
+    fig.update_layout(
+        title_text="总轴向力特性分析图 (F_total = F_backplate - F_blade_hub)", title_font_size=16,
+        plot_bgcolor="#1A1A1B", paper_bgcolor="#1A1A1B",
+        hovermode="x unified",
+        font=dict(family="'Roboto Mono', monospace", size=13, color="#E0E0E0"),
+        legend=dict(orientation="v", bordercolor="#555555",
+                    borderwidth=1, bgcolor="rgba(26,26,27,0.85)"),
+        margin=dict(l=80, r=80, t=80, b=60),
+    )
+    fig.update_xaxes(title_text=f"流量 ({flow_unit})",
+                     showgrid=True, gridcolor='#333333',
+                     showline=True, linecolor='#555555', linewidth=1.5,
+                     ticks="outside", ticklen=6, tickcolor='#555555', mirror=True)
+    fig.update_yaxes(title_text="总轴向力 (N) [指向入口为正]",
+                     showgrid=True, gridcolor='#333333',
+                     showline=True, linecolor='#555555', linewidth=1.5,
+                     ticks="outside", ticklen=6, tickcolor='#555555', mirror=True)
+    return fig

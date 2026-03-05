@@ -53,7 +53,16 @@ if "prefs_loaded" not in st.session_state:
     defaults = {
         "flow_unit": "kg/s",
         "pressure_display": "压比 (PR)",
-        "show_power": True
+        "show_power": True,
+        "page_mode": "性能曲线看板",
+        "has_seal": False,
+        "has_impeller_holes": False,
+        "has_backplate_holes": False,
+        "d_imp_mm": 500.0,
+        "d_shaft_mm": 100.0,
+        "d_seal_mm": 120.0,
+        "bp_gap_mm": 1.0,
+        "p_ambient_pa": 101325.0
     }
     for k, v in defaults.items():
         if k not in prefs:
@@ -86,6 +95,13 @@ def calc_specific_speed(rpm, flow_val, flow_unit, pr):
 
 # ─── 侧边栏 ───────────────────────────────────────────────────────────────────
 st.sidebar.header("控制面板")
+
+page_mode = st.sidebar.radio(
+    "导航菜单", ["性能曲线看板", "轴向力深度分析"],
+    key="page_mode", on_change=save_pref, args=("page_mode",)
+)
+st.sidebar.markdown("---")
+
 uploaded_file = st.sidebar.file_uploader("上传 CFX 结果 (CSV)", type=["csv"])
 
 unit_card = st.sidebar.container(border=True)
@@ -141,163 +157,231 @@ if uploaded_file:
         eff_source = "CSV 等熵效率列（直接值）" if can_use_csv_eff else "等熵公式计算值"
 
     # ─── 过滤阈值 ─────────────────────────────────────────────────────────────
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("数据过滤阈值")
-    min_pr_val = float(df[pressure_raw_col].min())
-    max_pr_val = float(df[pressure_raw_col].max())
-    
-    if "min_pr_threshold" not in st.session_state or not (1.0 <= st.session_state.min_pr_threshold <= max_pr_val):
-        st.session_state.min_pr_threshold = float(min_pr_val)
+    if page_mode == "性能曲线看板":
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("数据过滤阈值")
+        min_pr_val = float(df[pressure_raw_col].min())
+        max_pr_val = float(df[pressure_raw_col].max())
 
-    min_pr_threshold = st.sidebar.number_input(
-        "最低压比阈值", min_value=1.0, max_value=float(max_pr_val),
-        step=0.01, format="%.4f", key="min_pr_threshold", on_change=save_pref, args=("min_pr_threshold",)
-    )
-    max_power_threshold = None
-    if power_col in df.columns:
-        min_pwr = float(df[power_col].min())
-        max_pwr = float(df[power_col].max())
-        power_input_max = math.ceil(max_pwr) + 1
-        if st.sidebar.checkbox("启用最大功率阈值", value=False):
-            max_power_threshold = st.sidebar.number_input(
-                "最大功率阈值 (kW)",
-                min_value=float(min_pwr), max_value=float(power_input_max),
-                value=float(power_input_max), step=0.1, format="%.2f"
+        if "min_pr_threshold" not in st.session_state or not (1.0 <= st.session_state.min_pr_threshold <= max_pr_val):
+            st.session_state.min_pr_threshold = float(min_pr_val)
+
+        min_pr_threshold = st.sidebar.number_input(
+            "最低压比阈值", min_value=1.0, max_value=float(max_pr_val),
+            step=0.01, format="%.4f", key="min_pr_threshold", on_change=save_pref, args=("min_pr_threshold",)
+        )
+        max_power_threshold = None
+        if power_col in df.columns:
+            min_pwr = float(df[power_col].min())
+            max_pwr = float(df[power_col].max())
+            power_input_max = math.ceil(max_pwr) + 1
+            if st.sidebar.checkbox("启用最大功率阈值", value=False):
+                max_power_threshold = st.sidebar.number_input(
+                    "最大功率阈值 (kW)",
+                    min_value=float(min_pwr), max_value=float(power_input_max),
+                    value=float(power_input_max), step=0.1, format="%.2f"
+                )
+
+        # ─── 过滤计算 ─────────────────────────────────────────────────────────────
+        filtered_df, surge_line_df, peak_info = filter_operating_points(
+            df, flow_col="display_flow", pressure_col=pressure_raw_col,
+            min_pressure=min_pr_threshold, max_power=max_power_threshold, power_col=power_col
+        )
+        if filtered_df.empty:
+            st.warning("所有数据均被过滤条件剔除，请放宽阈值。"); st.stop()
+
+        with st.sidebar.expander("自动边界截断与喘振点诊断", expanded=False):
+            st.markdown("**检测到的真实数据最高压力点 (截断基准):**")
+            for spd, info in peak_info.items():
+                st.text(f"{spd} RPM: 取最大值 PR={info['pressure']:.4f} @ Flow={info['flow']:.4f}")
+            st.markdown("*注：系统自动舍去了流量小于最高压力点的所有「压降」散点数据。图表中曲线在最高压力点左侧的下垂，通常是由于插值算法(Spline)在平滑连接时的视觉过冲导致，并非真实残留数据。*")
+
+        # 压力单位换算（显示层）
+        filtered_df = filtered_df.copy()
+        filtered_df["display_pressure"] = convert_pressure_ratio_to_kpa(
+            filtered_df[pressure_raw_col], pressure_mode
+        )
+        if not surge_line_df.empty:
+            surge_line_df = surge_line_df.copy()
+            surge_line_df["display_pressure"] = convert_pressure_ratio_to_kpa(
+                surge_line_df[pressure_raw_col], pressure_mode
             )
 
-    # ─── 过滤计算 ─────────────────────────────────────────────────────────────
-    filtered_df, surge_line_df, peak_info = filter_operating_points(
-        df, flow_col="display_flow", pressure_col=pressure_raw_col,
-        min_pressure=min_pr_threshold, max_power=max_power_threshold, power_col=power_col
-    )
-    if filtered_df.empty:
-        st.warning("所有数据均被过滤条件剔除，请放宽阈值。"); st.stop()
+        # ─── 显示选项 ─────────────────────────────────────────────────────────────
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("显示选项")
+        show_power = st.sidebar.checkbox("显示功率曲线", key="show_power", on_change=save_pref, args=("show_power",))
 
-    with st.sidebar.expander("自动边界截断与喘振点诊断", expanded=False):
-        st.markdown("**检测到的真实数据最高压力点 (截断基准):**")
-        for spd, info in peak_info.items():
-            st.text(f"{spd} RPM: 取最大值 PR={info['pressure']:.4f} @ Flow={info['flow']:.4f}")
-        st.markdown("*注：系统自动舍去了流量小于最高压力点的所有「压降」散点数据。图表中曲线在最高压力点左侧的下垂，通常是由于插值算法(Spline)在平滑连接时的视觉过冲导致，并非真实残留数据。*")
+        show_efficiency  = False
+        eff_contour_step = 2.0
+        if has_efficiency:
+            show_efficiency = st.sidebar.checkbox(
+                "显示等效率曲线 & BEP", value=False,
+                help="叠加等效率等值线并标注 BEP"
+            )
+            if show_efficiency:
+                step_label = st.sidebar.radio("等效率线间距", ["2%", "5%"], horizontal=True)
+                eff_contour_step = 2.0 if step_label == "2%" else 5.0
+        else:
+            st.sidebar.info("CSV 缺少效率相关列，无法显示等效率线。")
 
-    # 压力单位换算（显示层）
-    filtered_df = filtered_df.copy()
-    filtered_df["display_pressure"] = convert_pressure_ratio_to_kpa(
-        filtered_df[pressure_raw_col], pressure_mode
-    )
-    if not surge_line_df.empty:
-        surge_line_df = surge_line_df.copy()
-        surge_line_df["display_pressure"] = convert_pressure_ratio_to_kpa(
-            surge_line_df[pressure_raw_col], pressure_mode
+        # ─── 曲线平滑度（分开控制） ───────────────────────────────────────────────
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("曲线平滑度")
+        perf_smooth = st.sidebar.slider(
+            "性能曲线平滑强度",
+            min_value=0.0, max_value=10.0, value=3.0, step=0.5,
+            help="控制压力/功率拟合曲线的平滑度（0=精确过点，10=最高平滑）"
+        )
+        eff_smooth = st.sidebar.slider(
+            "等效率线平滑强度",
+            min_value=0.0, max_value=10.0, value=5.0, step=0.5,
+            help="控制等效率等值线的圆滑程度（值越大越偏离原始网格，越圆润）",
+            disabled=not show_efficiency
         )
 
-    # ─── 显示选项 ─────────────────────────────────────────────────────────────
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("显示选项")
-    show_power = st.sidebar.checkbox("显示功率曲线", key="show_power", on_change=save_pref, args=("show_power",))
-
-    show_efficiency  = False
-    eff_contour_step = 2.0
-    if has_efficiency:
-        show_efficiency = st.sidebar.checkbox(
-            "显示等效率曲线 & BEP", value=False,
-            help="叠加等效率等值线并标注 BEP"
+        # ─── X 轴范围 ────────────────────────────────────────────────────────────
+        st.sidebar.markdown("---")
+        min_flow = float(filtered_df["display_flow"].min())
+        max_flow = float(filtered_df["display_flow"].max())
+        flow_range = st.sidebar.slider(
+            f"X轴流量显示范围 ({flow_unit})", min_flow, max_flow, (min_flow, max_flow)
         )
-        if show_efficiency:
-            step_label = st.sidebar.radio("等效率线间距", ["2%", "5%"], horizontal=True)
-            eff_contour_step = 2.0 if step_label == "2%" else 5.0
-    else:
-        st.sidebar.info("CSV 缺少效率相关列，无法显示等效率线。")
-
-    # ─── 曲线平滑度（分开控制） ───────────────────────────────────────────────
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("曲线平滑度")
-    perf_smooth = st.sidebar.slider(
-        "性能曲线平滑强度",
-        min_value=0.0, max_value=10.0, value=3.0, step=0.5,
-        help="控制压力/功率拟合曲线的平滑度（0=精确过点，10=最高平滑）"
-    )
-    eff_smooth = st.sidebar.slider(
-        "等效率线平滑强度",
-        min_value=0.0, max_value=10.0, value=5.0, step=0.5,
-        help="控制等效率等值线的圆滑程度（值越大越偏离原始网格，越圆润）",
-        disabled=not show_efficiency
-    )
-
-    # ─── X 轴范围 ────────────────────────────────────────────────────────────
-    st.sidebar.markdown("---")
-    min_flow = float(filtered_df["display_flow"].min())
-    max_flow = float(filtered_df["display_flow"].max())
-    flow_range = st.sidebar.slider(
-        f"X轴流量显示范围 ({flow_unit})", min_flow, max_flow, (min_flow, max_flow)
-    )
-    mask = (
-        (filtered_df["display_flow"] >= flow_range[0]) &
-        (filtered_df["display_flow"] <= flow_range[1])
-    )
-    final_df = filtered_df.loc[mask]
-    # ─── 绘图容器 ──────────────────────────────────────────────────────────────
-    plot_container = st.container(border=True)
-    plot_container.subheader("📈 动态绘图主区")
-    if final_df.empty:
-        plot_container.warning("当前流量范围内没有数据，请调整X轴显示范围。")
-    else:
-        fig = create_performance_curve(
-            final_df, surge_line_df,
-            x_col="display_flow", y1_col="display_pressure", y2_col=power_col,
-            x_label=f"流量 ({flow_unit})", y1_label=y1_label, y2_label="轴功率 (kW)",
-            perf_smooth=perf_smooth,
-            eff_smooth=eff_smooth,
-            show_power=show_power,
-            show_efficiency=show_efficiency,
-            eff_contour_step=eff_contour_step,
+        mask = (
+            (filtered_df["display_flow"] >= flow_range[0]) &
+            (filtered_df["display_flow"] <= flow_range[1])
         )
-        plot_container.plotly_chart(fig, use_container_width=True)
-        plot_container.info("💡 鼠标悬停在图表右上角 → 相机图标 → 下载高清 PNG")
+        final_df = filtered_df.loc[mask]
+        # ─── 绘图容器 ──────────────────────────────────────────────────────────────
+        plot_container = st.container(border=True)
+        plot_container.subheader("📈 动态绘图主区")
+        if final_df.empty:
+            plot_container.warning("当前流量范围内没有数据，请调整X轴显示范围。")
+        else:
+            fig = create_performance_curve(
+                final_df, surge_line_df,
+                x_col="display_flow", y1_col="display_pressure", y2_col=power_col,
+                x_label=f"流量 ({flow_unit})", y1_label=y1_label, y2_label="轴功率 (kW)",
+                perf_smooth=perf_smooth,
+                eff_smooth=eff_smooth,
+                show_power=show_power,
+                show_efficiency=show_efficiency,
+                eff_contour_step=eff_contour_step,
+            )
+            plot_container.plotly_chart(fig, use_container_width=True)
+            plot_container.info("💡 鼠标悬停在图表右上角 → 相机图标 → 下载高清 PNG")
 
-    # ─── 统计容器 ──────────────────────────────────────────────────────────────
-        stat_container = st.container(border=True)
-        stat_container.subheader("📊 统计概览区")
+        # ─── 统计容器 ──────────────────────────────────────────────────────────────
+            stat_container = st.container(border=True)
+            stat_container.subheader("📊 统计概览区")
+
+            if has_efficiency and "efficiency" in final_df.columns:
+                # 全局 BEP
+                bep_row = final_df.loc[final_df["efficiency"].idxmax()]
+                ns_global = calc_specific_speed(bep_row['speed_rpm'], bep_row['display_flow'], flow_unit, bep_row[pressure_raw_col])
+
+                stat_container.markdown("**🌍 全局最高效率点 (Global BEP)**")
+                c1, c2, c3, c4, c5 = stat_container.columns(5)
+                c1.metric("🏆 最高效率", f"{bep_row['efficiency']*100:.1f}%")
+                c2.metric("标准流量", f"{bep_row['display_flow']:.3f}")
+                c3.metric(y1_label, f"{bep_row['display_pressure']:.4f}")
+                c4.metric("所属转速", f"{int(bep_row['speed_rpm'])} RPM")
+                c5.metric("比转速 (Ns)", f"{ns_global:.1f}")
+
+                # 最高转速 BEP
+                max_rpm = final_df["speed_rpm"].max()
+                max_rpm_df = final_df[final_df["speed_rpm"] == max_rpm]
+                if not max_rpm_df.empty:
+                    max_bep_row = max_rpm_df.loc[max_rpm_df["efficiency"].idxmax()]
+                    ns_max = calc_specific_speed(max_bep_row['speed_rpm'], max_bep_row['display_flow'], flow_unit, max_bep_row[pressure_raw_col])
+
+                    stat_container.markdown(f"**🚀 最高转速工况 ({int(max_rpm)} RPM)**")
+                    rc1, rc2, rc3, rc4, rc5 = stat_container.columns(5)
+                    rc1.metric("🏆 最高效率", f"{max_bep_row['efficiency']*100:.1f}%")
+                    rc2.metric("标准流量", f"{max_bep_row['display_flow']:.3f}")
+                    rc3.metric(y1_label, f"{max_bep_row['display_pressure']:.4f}")
+                    rc4.metric("所属转速", f"{int(max_bep_row['speed_rpm'])} RPM")
+                    rc5.metric("比转速 (Ns)", f"{ns_max:.1f}")
+
+                stat_container.caption(f"效率数据来源：{eff_source} | 比转速 Ns 公式采用国内压缩机标准绝热头算法")
+
+            with stat_container.expander("📋 查看当前渲染的数据表"):
+                display_cols = ["speed_rpm", "display_flow", "display_pressure"]
+                if power_col in final_df.columns: display_cols.append(power_col)
+                if "efficiency" in final_df.columns: display_cols.append("efficiency")
+                show_df = final_df[display_cols].copy()
+                if "efficiency" in show_df.columns:
+                    show_df["efficiency"] = (show_df["efficiency"] * 100).round(2)
+                st.dataframe(show_df.rename(columns={
+                    "speed_rpm": "转速 (RPM)", "display_flow": f"流量 ({flow_unit})",
+                    "display_pressure": y1_label, power_col: "轴功率 (kW)", "efficiency": "等熵效率 [%]"
+                }))
+    elif page_mode == "轴向力深度分析":
+        from force_calculator import calculate_backplate_force, calculate_total_axial_force
         
-        if has_efficiency and "efficiency" in final_df.columns:
-            # 全局 BEP
-            bep_row = final_df.loc[final_df["efficiency"].idxmax()]
-            ns_global = calc_specific_speed(bep_row['speed_rpm'], bep_row['display_flow'], flow_unit, bep_row[pressure_raw_col])
+        st.subheader("⚙️ 轴向力深度分析与安全预警")
+        
+        # 侧边栏参数表单
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("几何与构型参数")
+        
+        d_impeller = st.sidebar.number_input("叶轮外径 D_imp (mm)", value=st.session_state.get("d_imp_mm", 500.0), key="d_imp_mm", on_change=save_pref, args=("d_imp_mm",))
+        d_shaft = st.sidebar.number_input("轴径 D_shaft (mm)", value=st.session_state.get("d_shaft_mm", 100.0), key="d_shaft_mm", on_change=save_pref, args=("d_shaft_mm",))
+        
+        has_seal = st.sidebar.checkbox("具备背板密封", value=st.session_state.get("has_seal", False), key="has_seal", on_change=save_pref, args=("has_seal",))
+        d_seal = 0.0
+        if has_seal:
+            d_seal = st.sidebar.number_input("密封直径 D_seal (mm)", value=st.session_state.get("d_seal_mm", 120.0), key="d_seal_mm", on_change=save_pref, args=("d_seal_mm",))
             
-            stat_container.markdown("**🌍 全局最高效率点 (Global BEP)**")
-            c1, c2, c3, c4, c5 = stat_container.columns(5)
-            c1.metric("🏆 最高效率", f"{bep_row['efficiency']*100:.1f}%")
-            c2.metric("标准流量", f"{bep_row['display_flow']:.3f}")
-            c3.metric(y1_label, f"{bep_row['display_pressure']:.4f}")
-            c4.metric("所属转速", f"{int(bep_row['speed_rpm'])} RPM")
-            c5.metric("比转速 (Ns)", f"{ns_global:.1f}")
+        has_imp_holes = st.sidebar.checkbox("叶轮平衡孔", value=st.session_state.get("has_impeller_holes", False), key="has_impeller_holes", on_change=save_pref, args=("has_impeller_holes",))
+        has_bp_holes = st.sidebar.checkbox("背板平衡孔 (连通大气)", value=st.session_state.get("has_backplate_holes", False), key="has_backplate_holes", on_change=save_pref, args=("has_backplate_holes",))
+        
+        p_ambient = 101325.0
+        if has_bp_holes:
+            p_ambient = st.sidebar.number_input("外部大气压 P_amb (Pa)", value=st.session_state.get("p_ambient_pa", 101325.0), key="p_ambient_pa", on_change=save_pref, args=("p_ambient_pa",))
             
-            # 最高转速 BEP
-            max_rpm = final_df["speed_rpm"].max()
-            max_rpm_df = final_df[final_df["speed_rpm"] == max_rpm]
-            if not max_rpm_df.empty:
-                max_bep_row = max_rpm_df.loc[max_rpm_df["efficiency"].idxmax()]
-                ns_max = calc_specific_speed(max_bep_row['speed_rpm'], max_bep_row['display_flow'], flow_unit, max_bep_row[pressure_raw_col])
+        bp_gap = st.sidebar.number_input("背板间隙 b_b (mm)", value=st.session_state.get("bp_gap_mm", 1.0), key="bp_gap_mm", on_change=save_pref, args=("bp_gap_mm",))
+        
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("安全与报警界限")
+        max_bearing_load = st.sidebar.number_input("轴承极限载荷 (N)", value=5000.0, step=100.0)
+        
+        if "axial_force" not in df.columns:
+            st.warning("⚠️ 你的 CSV 数据中未提供 '轴向力(N)' 列，无法计算总轴向力。")
+        else:
+            def row_calc(row):
+                rpm = row['speed_rpm']
+                p_out_pa = row['pressure_ratio'] * 101325.0
+                p_in_pa = 101325.0
                 
-                stat_container.markdown(f"**🚀 最高转速工况 ({int(max_rpm)} RPM)**")
-                rc1, rc2, rc3, rc4, rc5 = stat_container.columns(5)
-                rc1.metric("🏆 最高效率", f"{max_bep_row['efficiency']*100:.1f}%")
-                rc2.metric("标准流量", f"{max_bep_row['display_flow']:.3f}")
-                rc3.metric(y1_label, f"{max_bep_row['display_pressure']:.4f}")
-                rc4.metric("所属转速", f"{int(max_bep_row['speed_rpm'])} RPM")
-                rc5.metric("比转速 (Ns)", f"{ns_max:.1f}")
+                f_bp = calculate_backplate_force(
+                    rpm=rpm, p_out_pa=p_out_pa, p_in_pa=p_in_pa, rho=1.204,
+                    d_impeller_mm=d_impeller, d_shaft_mm=d_shaft,
+                    has_seal=has_seal, d_seal_mm=d_seal,
+                    has_impeller_holes=has_imp_holes,
+                    has_backplate_holes=has_bp_holes,
+                    p_ambient_pa=p_ambient, k_factor=0.5
+                )
+                
+                f_blade = row["axial_force"]
+                f_tot = calculate_total_axial_force(f_blade, f_bp)
+                return pd.Series([f_bp, f_tot])
+                
+            df[["f_backplate", "f_total"]] = df.apply(row_calc, axis=1)
+            
+            # 绘图容器
+            plot_c = st.container(border=True)
+            from plotter import create_axial_force_curve
+            fig = create_axial_force_curve(df, "display_flow", "f_total", max_bearing_load, flow_unit)
+            plot_c.plotly_chart(fig, use_container_width=True)
+            
+            # 安全警报诊断区
+            alerts_df = df[ (df["f_total"].abs() > max_bearing_load) | (df["f_total"] < 0) ]
+            if not alerts_df.empty:
+                st.error("🚨 **发现不安全工况区域！** 存在总力反向或超过轴承承载能力的点！")
+                st.dataframe(alerts_df[["speed_rpm", "display_flow", "axial_force", "f_backplate", "f_total"]].style.highlight_max(axis=0, color='red'))
+            else:
+                st.success("✅ **当前几何与工况下安全**：所有工作点轴向力都在设计承载包络内，且方向始终维持稳定。")
 
-            stat_container.caption(f"效率数据来源：{eff_source} | 比转速 Ns 公式采用国内压缩机标准绝热头算法")
-
-        with stat_container.expander("📋 查看当前渲染的数据表"):
-            display_cols = ["speed_rpm", "display_flow", "display_pressure"]
-            if power_col in final_df.columns: display_cols.append(power_col)
-            if "efficiency" in final_df.columns: display_cols.append("efficiency")
-            show_df = final_df[display_cols].copy()
-            if "efficiency" in show_df.columns:
-                show_df["efficiency"] = (show_df["efficiency"] * 100).round(2)
-            st.dataframe(show_df.rename(columns={
-                "speed_rpm": "转速 (RPM)", "display_flow": f"流量 ({flow_unit})",
-                "display_pressure": y1_label, power_col: "轴功率 (kW)", "efficiency": "等熵效率 [%]"
-            }))
 else:
     st.info("👈 请从左侧导入 CSV 数据文件开始。")

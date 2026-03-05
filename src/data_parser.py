@@ -6,6 +6,7 @@ HEADER_MAP = {
     "轴功率": "shaft_power",
     "设定转速": "speed_rpm",
     "等熵效率": "efficiency_pct",   # CFX provides this directly (unit: %)
+    "轴向力(N)": "axial_force",
 }
 
 P_ATM_KPA       = 101.325    # kPa
@@ -27,7 +28,13 @@ def normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
             if ch_key in col:
                 rename_dict[col] = en_key
                 break
-    return df_clean.rename(columns=rename_dict)
+    df_clean.rename(columns=rename_dict, inplace=True)
+    
+    if "axial_force" in df_clean.columns:
+        # Invert axial force convention: make Motor -> Inlet positive
+        df_clean["axial_force"] = -1 * df_clean["axial_force"]
+        
+    return df_clean
 
 def convert_flow_units(value: float, from_unit: str, to_unit: str, density: float = AIR_DENSITY_20C) -> float:
     """在 kg/s, m3/min, m3/h, CFM 之间转换流量单位。
