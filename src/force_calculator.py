@@ -11,7 +11,7 @@ def calculate_backplate_force(
     d_seal2_mm: float = 0.0,
     has_balance_holes: bool = False, 
     d_hole_mm: float = 0.0,
-    a_hole_cm2: float = 0.0,
+    a_hole_mm2: float = 0.0,
     alpha: float = 0.3,
     p_hole_target_pa: float = 101325.0,
     p_ambient_pa: float = 101325.0,
@@ -55,7 +55,7 @@ def calculate_backplate_force(
         P_root_actual = P_root_theoretical
         
         # 若有平衡孔，按孔所在圆周处的理论压力进行阻力折减
-        if has_balance_holes and a_hole_cm2 > 0 and d_hole_mm > 0:
+        if has_balance_holes and a_hole_mm2 > 0 and d_hole_mm > 0:
             R_hole = (d_hole_mm / 2.0) / 1000.0
             # 限制孔位置在腔体内
             if R_hole > R_s2: R_hole = R_s2
@@ -65,7 +65,7 @@ def calculate_backplate_force(
             P_hole_theoretical = P_at_Rs2 - 0.5 * rho * (omega_fluid**2) * (R_s2**2 - R_hole**2)
             
             # 使用泄压系数逼进目标压力 (入口或大气)
-            relief_ratio = min(1.0, alpha * (a_hole_cm2 / 10.0))
+            relief_ratio = min(1.0, alpha * (a_hole_mm2 / 1000.0))
             P_hole_actual = P_hole_theoretical - relief_ratio * (P_hole_theoretical - p_hole_target_pa)
             
             # 锚定此处的实际压力后，再向下推演到根部的压力

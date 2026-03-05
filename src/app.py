@@ -356,9 +356,9 @@ if uploaded_file:
                 help="平衡孔所在圆周的直径。该处的压力会被泄压拉低，进而影响整个内腔的压力梯级基准。"
             )
             a_hole = st.sidebar.number_input(
-                "平衡孔总面积 A_hole (cm²)", value=st.session_state.get("a_hole_cm2", 15.0), 
-                key="a_hole_cm2", on_change=save_pref, args=("a_hole_cm2",),
-                help="影响泄压效果的关键几何参数，面积越大内腔压力越趋近于入口压力，直接决定合力方向。"
+                "平衡孔总面积 A_hole (mm²)", value=st.session_state.get("a_hole_mm2", 1500.0), 
+                key="a_hole_mm2", on_change=save_pref, args=("a_hole_mm2",),
+                help="影响泄压效果的关键几何参数，面积越大内腔压力越趋近于泄压孔所连通的区域气压。"
             )
             alpha_hole = st.sidebar.number_input(
                 "泄压系数 α", min_value=0.0, max_value=1.0, value=st.session_state.get("alpha_hole", 0.3), step=0.05,
@@ -401,7 +401,7 @@ if uploaded_file:
                     d_seal2_mm=d_seal2,
                     has_balance_holes=has_bp_holes,
                     d_hole_mm=d_hole,
-                    a_hole_cm2=a_hole,
+                    a_hole_mm2=a_hole,
                     alpha=alpha_hole,
                     p_hole_target_pa=p_target,
                     p_ambient_pa=p_ambient, 
