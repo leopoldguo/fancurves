@@ -258,7 +258,7 @@ if uploaded_file:
         stat_container = st.container(border=True)
         stat_container.subheader("📊 统计概览区")
         
-        if show_efficiency and has_efficiency and "efficiency" in final_df.columns:
+        if has_efficiency and "efficiency" in final_df.columns:
             # 全局 BEP
             bep_row = final_df.loc[final_df["efficiency"].idxmax()]
             ns_global = calc_specific_speed(bep_row['speed_rpm'], bep_row['display_flow'], flow_unit, bep_row[pressure_raw_col])
@@ -280,10 +280,10 @@ if uploaded_file:
                 
                 stat_container.markdown(f"**🚀 最高转速工况 ({int(max_rpm)} RPM)**")
                 rc1, rc2, rc3, rc4, rc5 = stat_container.columns(5)
-                rc1.metric("该转速最高效率", f"{max_bep_row['efficiency']*100:.1f}%")
-                rc2.metric("最大流量", f"{max_rpm_df['display_flow'].max():.3f}")
-                rc3.metric("最大压力", f"{max_rpm_df['display_pressure'].max():.4f}")
-                rc4.metric("对应效率流压", f"Flow:{max_bep_row['display_flow']:.2f}")
+                rc1.metric("🏆 最高效率", f"{max_bep_row['efficiency']*100:.1f}%")
+                rc2.metric("标准流量", f"{max_bep_row['display_flow']:.3f}")
+                rc3.metric(y1_label, f"{max_bep_row['display_pressure']:.4f}")
+                rc4.metric("所属转速", f"{int(max_bep_row['speed_rpm'])} RPM")
                 rc5.metric("比转速 (Ns)", f"{ns_max:.1f}")
 
             stat_container.caption(f"效率数据来源：{eff_source} | 比转速 Ns 公式采用国内压缩机标准绝热头算法")
