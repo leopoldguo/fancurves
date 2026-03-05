@@ -253,11 +253,11 @@ def create_performance_curve(
 
     fig = make_subplots(specs=[[{"secondary_y": True}]])
     dense_eff_list = []
-    
-    colors = pc.qualitative.Plotly
+    # Bright vivid palette for dark mode
+    colors = ["#FF3B30", "#FF9500", "#FFCC00", "#4CD964", "#5AC8FA", "#007AFF", "#AF52DE", "#FF2D55"]
 
     if "speed_rpm" in df.columns:
-        for i, speed in enumerate(sorted(df["speed_rpm"].unique())):
+        for i, speed in enumerate(sorted(df["speed_rpm"].unique(), reverse=True)):
             color = colors[i % len(colors)]
             
             sd = df[df["speed_rpm"] == speed].sort_values(by=x_col)
@@ -312,8 +312,8 @@ def create_performance_curve(
         fig.add_trace(
             go.Scatter(x=surge_line_df[x_col], y=surge_line_df[y1_col],
                        name='Surge Line', mode='lines+markers',
-                       line=dict(color='black', width=2.5, dash='dot'),
-                       marker=dict(size=8, symbol='diamond-open')),
+                       line=dict(color='#FF3B30', width=2.5, dash='dot'),
+                       marker=dict(size=8, symbol='diamond-open', color='#FF3B30')),
             secondary_y=False)
 
     if show_efficiency and "efficiency" in df.columns:
