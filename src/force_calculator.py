@@ -13,6 +13,7 @@ def calculate_backplate_force(
     d_hole_mm: float = 0.0,
     a_hole_cm2: float = 0.0,
     alpha: float = 0.3,
+    p_hole_target_pa: float = 101325.0,
     p_ambient_pa: float = 101325.0,
     k_factor: float = 0.15
 ) -> float:
@@ -63,9 +64,9 @@ def calculate_backplate_force(
             # 计算该圆周处的理论未泄压压力
             P_hole_theoretical = P_at_Rs2 - 0.5 * rho * (omega_fluid**2) * (R_s2**2 - R_hole**2)
             
-            # 使用泄压系数逼进入口压力
+            # 使用泄压系数逼进目标压力 (入口或大气)
             relief_ratio = min(1.0, alpha * (a_hole_cm2 / 10.0))
-            P_hole_actual = P_hole_theoretical - relief_ratio * (P_hole_theoretical - P_in_abs)
+            P_hole_actual = P_hole_theoretical - relief_ratio * (P_hole_theoretical - p_hole_target_pa)
             
             # 锚定此处的实际压力后，再向下推演到根部的压力
             P_root_actual = P_hole_actual - 0.5 * rho * (omega_fluid**2) * (R_hole**2 - R_in**2)

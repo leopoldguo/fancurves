@@ -352,10 +352,13 @@ if uploaded_file:
                 help="位于背板外侧的辅助密封，切断高压区，显著改变压力积分区间。"
             )
             
-        has_bp_holes = st.sidebar.checkbox(
-            "开启平衡孔泄压", value=st.session_state.get("has_balance_holes", False), 
-            key="has_balance_holes", on_change=save_pref, args=("has_balance_holes",)
+        bp_hole_options = ["无平衡孔", "叶轮盲孔 (内连通入口)", "机壳穿孔 (外连通大气)"]
+        hole_type = st.sidebar.selectbox(
+            "平衡孔类型与位置", bp_hole_options, 
+            index=bp_hole_options.index(st.session_state.get("hole_type", "无平衡孔")) if st.session_state.get("hole_type", "无平衡孔") in bp_hole_options else 0,
+            key="hole_type", on_change=save_pref, args=("hole_type",)
         )
+        has_bp_holes = hole_type != "无平衡孔"
         
         d_hole = 0.0
         a_hole = 0.0
@@ -394,6 +397,15 @@ if uploaded_file:
                 p_out_gauge_pa = (row[pressure_raw_col] - 1.0) * 101325.0
                 p_in_gauge_pa = 0.0 # 假定入口处为常压（0 Gauge）
                 
+                # 确定目标泄压
+                p_in_abs = p_in_gauge_pa + p_ambient
+                if hole_type == "叶轮盲孔 (内连通入口)":
+                    p_target = p_in_abs
+                elif hole_type == "机壳穿孔 (外连通大气)":
+                    p_target = p_ambient
+                else:
+                    p_target = p_in_abs
+                
                 f_bp = calculate_backplate_force(
                     rpm=rpm, 
                     p_out_gauge_pa=p_out_gauge_pa, 
@@ -407,6 +419,7 @@ if uploaded_file:
                     d_hole_mm=d_hole,
                     a_hole_cm2=a_hole,
                     alpha=alpha_hole,
+                    p_hole_target_pa=p_target,
                     p_ambient_pa=p_ambient, 
                     k_factor=k_factor
                 )
@@ -422,6 +435,24 @@ if uploaded_file:
             from plotter import create_axial_force_curve
             fig = create_axial_force_curve(df, "display_flow", "f_total", flow_unit)
             plot_c.plotly_chart(fig, use_container_width=True)
+            
+            # 统计概览区
+            stat_container = st.container(border=True)
+            stat_container.subheader("📊 轴向力极值诊断")
+            
+            # 寻找最大轴向力绝对值
+            max_abs_idx = df["f_total"].abs().idxmax()
+            max_row = df.loc[max_abs_idx]
+            max_force_val = max_row["f_total"]
+            dir_str = "指向入口 (即电机 -> 叶轮方向)" if max_force_val > 0 else "推向电机 (即叶轮 -> 电机方向)"
+            
+            stat_container.markdown(f"**🔥 核心关注点：最大合力工况发生于 {int(max_row['speed_rpm'])} RPM**")
+            c1, c2, c3, c4 = stat_container.columns(4)
+            c1.metric("最大净合力", f"{abs(max_force_val):.2f} N")
+            c2.metric("力系方向", dir_str)
+            c3.metric(f"对应流量 ({flow_unit})", f"{max_row['display_flow']:.3f}")
+            if "efficiency" in max_row:
+                c4.metric("该点效率", f"{max_row['efficiency']*100:.1f}%")
             
             # 动态数据表展示
             with st.expander("📋 查看轴向力计算核心数据", expanded=False):
