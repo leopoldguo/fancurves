@@ -225,33 +225,10 @@ if uploaded_file:
         else:
             st.sidebar.info("CSV 缺少效率相关列，无法显示等效率线。")
 
-        # ─── 曲线平滑度（分开控制） ───────────────────────────────────────────────
-        st.sidebar.markdown("---")
-        st.sidebar.subheader("曲线平滑度")
-        perf_smooth = st.sidebar.slider(
-            "性能曲线平滑强度",
-            min_value=0.0, max_value=10.0, value=3.0, step=0.5,
-            help="控制压力/功率拟合曲线的平滑度（0=精确过点，10=最高平滑）"
-        )
-        eff_smooth = st.sidebar.slider(
-            "等效率线平滑强度",
-            min_value=0.0, max_value=10.0, value=5.0, step=0.5,
-            help="控制等效率等值线的圆滑程度（值越大越偏离原始网格，越圆润）",
-            disabled=not show_efficiency
-        )
-
-        # ─── X 轴范围 ────────────────────────────────────────────────────────────
-        st.sidebar.markdown("---")
-        min_flow = float(filtered_df["display_flow"].min())
-        max_flow = float(filtered_df["display_flow"].max())
-        flow_range = st.sidebar.slider(
-            f"X轴流量显示范围 ({flow_unit})", min_flow, max_flow, (min_flow, max_flow)
-        )
-        mask = (
-            (filtered_df["display_flow"] >= flow_range[0]) &
-            (filtered_df["display_flow"] <= flow_range[1])
-        )
-        final_df = filtered_df.loc[mask]
+        # ─── 曲线平滑度与 X 轴范围 (已精简) ──────────────────────────────────────────────
+        perf_smooth = 3.0
+        eff_smooth = 5.0
+        final_df = filtered_df.copy()
         # ─── 绘图容器 ──────────────────────────────────────────────────────────────
         plot_container = st.container(border=True)
         plot_container.subheader("📈 动态绘图主区")
@@ -340,18 +317,6 @@ if uploaded_file:
             help="默认的内侧轴封位置边界。"
         )
         
-        has_seal2 = st.sidebar.checkbox(
-            "启用第2道密封 (背板外侧)", value=st.session_state.get("has_seal2", False), 
-            key="has_seal2", on_change=save_pref, args=("has_seal2",)
-        )
-        d_seal2 = 0.0
-        if has_seal2:
-            d_seal2 = st.sidebar.number_input(
-                "第2道密封直径 D_s2 (mm)", value=st.session_state.get("d_seal2_mm", 300.0), 
-                key="d_seal2_mm", on_change=save_pref, args=("d_seal2_mm",),
-                help="位于背板外侧的辅助密封，切断高压区，显著改变压力积分区间。"
-            )
-            
         bp_hole_options = ["无平衡孔", "叶轮盲孔 (内连通入口)", "机壳穿孔 (外连通大气)"]
         hole_type = st.sidebar.selectbox(
             "平衡孔类型与位置", bp_hole_options, 
@@ -359,6 +324,25 @@ if uploaded_file:
             key="hole_type", on_change=save_pref, args=("hole_type",)
         )
         has_bp_holes = hole_type != "无平衡孔"
+        
+        # 若有平衡孔，强制自动联动第2道密封
+        target_seal2_val = True if has_bp_holes else st.session_state.get("has_seal2", False)
+        
+        has_seal2 = st.sidebar.checkbox(
+            "启用第2道密封 (背板外侧)", value=target_seal2_val, 
+            key="has_seal2", on_change=save_pref, args=("has_seal2",),
+            disabled=has_bp_holes,
+            help="若开启平衡孔，必须拥有第2道密封来维系独立的压力腔室。" if has_bp_holes else "位于背板外侧的辅助密封，切断高压区，显著改变压力积分区间。"
+        )
+        if has_bp_holes: has_seal2 = True
+        
+        d_seal2 = 0.0
+        if has_seal2:
+            d_seal2 = st.sidebar.number_input(
+                "第2道密封直径 D_s2 (mm)", value=st.session_state.get("d_seal2_mm", 300.0), 
+                key="d_seal2_mm", on_change=save_pref, args=("d_seal2_mm",),
+                help="位于背板外侧的辅助密封，切断高压区，显著改变压力积分区间。"
+            )
         
         d_hole = 0.0
         a_hole = 0.0
