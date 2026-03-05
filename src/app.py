@@ -114,6 +114,19 @@ if uploaded_file:
             surge_line_df[pressure_raw_col], pressure_mode
         )
 
+    # ─── 曲线平滑控制 ────────────────────────────────────────────────────────
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("曲线平滑度")
+    smooth_level = st.sidebar.slider(
+        "平滑强度",
+        min_value=0.0, max_value=10.0, value=3.0, step=0.5,
+        help="0 = 精确过每一个计算点（折线感），10 = 高平滑（经典风机曲线风格）"
+    )
+    # Convert UI level to scipy smoothing_factor:
+    # Level 0 → s very small (near-interpolating), Level 10 → s large (very smooth)
+    # We use None to let scipy auto-choose, then multiply by level factor.
+    _smooth_base = None if smooth_level == 0 else smooth_level
+
     # ─── X 轴范围滑块 ────────────────────────────────────────────────────────
     st.sidebar.markdown("---")
     min_flow = float(filtered_df["display_flow"].min())
@@ -139,7 +152,8 @@ if uploaded_file:
             y2_col=power_col,
             x_label=f"流量 ({flow_unit})",
             y1_label=y1_label,
-            y2_label="轴功率 (kW)"
+            y2_label="轴功率 (kW)",
+            smoothing_factor=_smooth_base,
         )
         st.plotly_chart(fig, use_container_width=True)
 
