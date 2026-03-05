@@ -29,7 +29,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🎛️ 交互式风机性能曲线数据看板 (Industrial)")
+st.title("风机性能曲线数据看板")
 
 PREFS_FILE = "user_prefs.json"
 
@@ -259,7 +259,7 @@ if uploaded_file:
         final_df = filtered_df.copy()
         # ─── 绘图容器 ──────────────────────────────────────────────────────────────
         plot_container = st.container(border=True)
-        plot_container.subheader("📈 动态绘图主区")
+        plot_container.subheader("📈 性能图谱区")
         if final_df.empty:
             plot_container.warning("当前流量范围内没有数据，请调整X轴显示范围。")
         else:
@@ -324,7 +324,7 @@ if uploaded_file:
     elif page_mode == "轴向力深度分析":
         from force_calculator import calculate_backplate_force, calculate_total_axial_force
         
-        st.subheader("⚙️ 轴向力深度分析与安全预警")
+        st.subheader("⚙️ 轴向力深度分析")
         
         # --- 真空度展示 ---
         if not df.empty and "p_in_pa" in df.columns:
