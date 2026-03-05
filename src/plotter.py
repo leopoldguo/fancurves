@@ -9,7 +9,8 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 _SMOOTH_POINTS = 300
-_CONTOUR_PTS   = 600   # denser output for contour curves
+_CONTOUR_PTS   = 600
+
 
 # ─── Performance curve smoothing ─────────────────────────────────────────────
 
@@ -19,7 +20,6 @@ def _smooth_series(
     n_points: int = _SMOOTH_POINTS,
     smooth_level: float = 3.0,
 ) -> tuple:
-    """Smooth a 1-D series via UnivariateSpline."""
     if len(x) < 4:
         return x, y
     order = np.argsort(x)
@@ -57,18 +57,21 @@ def _smooth_path(
     smooth_level: float = 3.0,
 ) -> tuple:
     """
-    Smooth a 2-D contour path using splprep, analogous to how _smooth_series
-    works for 1-D performance curves.
+    Smooth a 2-D contour path via splprep.
 
-    The smoothing factor s is auto-scaled to the path's geometric variance,
-    then multiplied by the same level-to-multiplier mapping as _smooth_series.
+    Key: coordinates are NORMALISED to [0,1] before fitting so the smoothing
+    parameter s has coordinate-scale-independent meaning.  This ensures the
+    0-10 slider produces visually distinct results at every position:
 
-    smooth_level 0   → s=0, exact through every vertex (only densification)
-    smooth_level 3   → moderate curvature, recommended
-    smooth_level 10  → strong smoothing; contour deviates visibly from grid
+      smooth_level 0  → s = 0   (exact through all vertices)
+      smooth_level 1  → s ≈ 1e-4 (barely perceptible)
+      smooth_level 5  → s ≈ 0.007 (~2–3% avg deviation vs path width)
+      smooth_level 10 → s ≈ 0.5   (~7–10% avg deviation, strongly smoothed)
 
-    Closed paths (BEP inner ring) use per=True for seamless circular closure.
-    Open paths use per=False; endpoints are naturally preserved.
+    Mapping: s_norm = 10 ^ (-4 + smooth_level/10 × 3.699)
+
+    Closed paths (BEP ring): per=True → seamless circular closure.
+    Open paths: per=False → endpoints preserved, no artificial closure.
     """
     if len(px) < 4:
         return px, py
@@ -79,26 +82,29 @@ def _smooth_path(
         return px, py
 
     closed = _is_closed_path(px, py)
-    n = len(px)
 
-    # Auto-scale s to path geometry — same spirit as _smooth_series
-    # Use mean variance of x and y, scaled by n
-    auto_s_x = max(float(n) * float(np.var(px)), 1e-12)
-    auto_s_y = max(float(n) * float(np.var(py)), 1e-12)
-    auto_s   = (auto_s_x + auto_s_y) / 2.0
+    # Normalise to [0,1] so s is scale-independent
+    x_min, x_max = px.min(), px.max()
+    y_min, y_max = py.min(), py.max()
+    x_rng = max(x_max - x_min, 1e-10)
+    y_rng = max(y_max - y_min, 1e-10)
+    pxn = (px - x_min) / x_rng
+    pyn = (py - y_min) / y_rng
 
     if smooth_level <= 0.0:
         s = 0.0
     else:
-        multiplier = 0.05 * (10 ** (smooth_level / 10 * np.log10(100)))
-        s = auto_s * multiplier
+        # Log-scale mapping in normalised space:
+        # level 1 → s≈1e-4,  level 5 → s≈0.007,  level 10 → s≈0.5
+        s = 10 ** (-4.0 + smooth_level / 10.0 * np.log10(0.5 / 1e-4))
 
     try:
-        k = min(3, n - 1)
-        tck, _ = splprep([px, py], s=s, k=k, per=closed)
+        k = min(3, len(pxn) - 1)
+        tck, _ = splprep([pxn, pyn], s=s, k=k, per=closed)
         u_fine = np.linspace(0., 1., n_pts)
-        x_s, y_s = splev(u_fine, tck)
-        return np.array(x_s), np.array(y_s)
+        xsn, ysn = splev(u_fine, tck)
+        # Denormalise
+        return np.array(xsn) * x_rng + x_min, np.array(ysn) * y_rng + y_min
     except Exception:
         return px, py
 
@@ -111,7 +117,6 @@ def _mask_below_min_speed(
     x_col: str,
     y_col: str,
 ) -> np.ndarray:
-    """Mask efficiency grid cells below the lowest-RPM performance curve."""
     if "speed_rpm" not in df.columns:
         return EI_pct
     min_speed = df["speed_rpm"].min()
@@ -137,7 +142,6 @@ def _mask_below_min_speed(
 
 
 def _extract_contour_paths(xi, yi, grid_pct, levels_pct):
-    """Extract contour paths via matplotlib (Agg backend)."""
     import numpy.ma as ma
     grid_masked = ma.masked_invalid(grid_pct)
     fig_mpl, ax_mpl = plt.subplots()
@@ -169,10 +173,6 @@ def _add_efficiency_contours(
     smooth_level: float = 3.0,
     grid_n: int = 400,
 ) -> go.Figure:
-    """
-    Overlay smooth iso-efficiency contours.
-    smooth_level is shared with performance curves so one slider controls both.
-    """
     if eff_col not in df.columns or df[eff_col].isna().all():
         return fig
 
@@ -317,7 +317,7 @@ def create_performance_curve(
             fig, df, x_col=x_col, y_col=y1_col,
             eff_col="efficiency",
             contour_step_pct=eff_contour_step,
-            smooth_level=smooth_level,   # ← same slider as performance curves
+            smooth_level=smooth_level,
         )
 
     fig.update_layout(
