@@ -70,11 +70,11 @@ if uploaded_file:
         st.error("未能识别压力列，请确保 CSV 包含'压比'等关键词。")
         st.stop()
 
-    # ─── 计算效率（在过滤之前，基于原始数据） ─────────────────────────────────
+    # ─── 计算效率（过滤前，基于原始数据） ────────────────────────────────────
     has_efficiency = (
-        "mass_flow"       in df.columns and
-        pressure_raw_col  in df.columns and
-        power_col         in df.columns
+        "mass_flow"      in df.columns and
+        pressure_raw_col in df.columns and
+        power_col        in df.columns
     )
     if has_efficiency:
         df = compute_efficiency(df)
@@ -137,11 +137,11 @@ if uploaded_file:
     st.sidebar.markdown("---")
     st.sidebar.subheader("最佳效率点 & 等效率线")
     show_efficiency = False
-    eff_contour_step = 0.02
+    eff_contour_step = 2.0   # percent (2.0 or 5.0)
     if has_efficiency:
         show_efficiency = st.sidebar.checkbox(
             "显示等效率曲线 & BEP", value=False,
-            help="在图上叠加等效率等值线（网格插值）并标注最佳效率点（BEP）"
+            help="在图上叠加等效率等值线并标注最佳效率点（BEP）"
         )
         if show_efficiency:
             step_label = st.sidebar.radio(
@@ -149,7 +149,7 @@ if uploaded_file:
                 ["2%", "5%"],
                 horizontal=True
             )
-            eff_contour_step = 0.02 if step_label == "2%" else 0.05
+            eff_contour_step = 2.0 if step_label == "2%" else 5.0  # percent, NOT fraction
     else:
         st.sidebar.info("CSV 缺少效率计算所需列（进口流量、压比、轴功率），无法显示等效率线。")
 
@@ -203,7 +203,7 @@ if uploaded_file:
             col1, col2, col3, col4 = st.columns(4)
             col1.metric("🏆 BEP 效率", f"{bep_row['efficiency']*100:.1f}%")
             col2.metric("流量 (BEP)", f"{bep_row['display_flow']:.3f} {flow_unit}")
-            col3.metric("压力 (BEP)", f"{bep_row['display_pressure']:.4f} {y1_label.split('[')[-1].rstrip(']')}")
+            col3.metric("压力 (BEP)", f"{bep_row['display_pressure']:.4f}")
             col4.metric("转速 (BEP)", f"{int(bep_row['speed_rpm'])} RPM")
 
         st.info("💡 将鼠标悬停在图表右上角，点击相机图标可下载高清 PNG 图片。")
@@ -219,8 +219,12 @@ if uploaded_file:
                 "display_flow": f"流量 ({flow_unit})",
                 "display_pressure": y1_label,
                 power_col: "轴功率 (kW)",
-                "efficiency": "效率 [-]"
+                "efficiency": "效率 [%]"
             }
-            st.dataframe(final_df[display_cols].rename(columns=rename_map))
+            # Show efficiency as percentage in table
+            show_df = final_df[display_cols].copy()
+            if "efficiency" in show_df.columns:
+                show_df["efficiency"] = (show_df["efficiency"] * 100).round(2)
+            st.dataframe(show_df.rename(columns=rename_map))
 else:
     st.info("👈 请从左侧导入 CSV 数据文件开始。")

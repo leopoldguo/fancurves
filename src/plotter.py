@@ -51,63 +51,78 @@ def _add_efficiency_contours(
     x_col: str,
     y_col: str,
     eff_col: str = "efficiency",
-    contour_step: float = 0.02,
-    grid_n: int = 200,
+    contour_step_pct: float = 2.0,   # percent, e.g. 2.0 for 2%
+    grid_n: int = 250,
 ) -> go.Figure:
     """
-    Overlay iso-efficiency contour curves on the primary (left Y-axis) panel.
+    Overlay smooth iso-efficiency contour curves on the primary (left Y-axis).
 
-    Uses scipy.interpolate.griddata (linear) to create a fine 2D efficiency
-    field from the scattered (flow, pressure, efficiency) data, then draws
-    Plotly contour lines at intervals of `contour_step` (e.g. 0.02 = 2%).
-    Also plots the Best Efficiency Point (BEP) as a gold star marker.
+    Key design decisions:
+    - Efficiency stored as [0,1] is converted to [0,100]% for display.
+    - griddata(method='linear') returns NaN outside the data convex hull,
+      Plotly Contour with connectgaps=False leaves those regions blank
+      (no extrapolated straight lines).
+    - line.smoothing=1.3 gives smooth, curved iso-lines.
     """
     if eff_col not in df.columns or df[eff_col].isna().all():
         return fig
 
-    x_data = df[x_col].to_numpy(dtype=float)
-    y_data = df[y_col].to_numpy(dtype=float)
+    x_data   = df[x_col].to_numpy(dtype=float)
+    y_data   = df[y_col].to_numpy(dtype=float)
     eff_data = df[eff_col].to_numpy(dtype=float)
 
-    # Remove NaN / zero-efficiency rows (e.g. interpolated boundary points)
-    valid = np.isfinite(eff_data) & (eff_data > 0)
+    # Only use rows with valid efficiency
+    valid = np.isfinite(eff_data) & (eff_data > 1e-6)
     if valid.sum() < 4:
         return fig
     x_data, y_data, eff_data = x_data[valid], y_data[valid], eff_data[valid]
 
-    # 2-D grid for contour interpolation
-    xi = np.linspace(x_data.min(), x_data.max(), grid_n)
-    yi = np.linspace(y_data.min(), y_data.max(), grid_n)
-    XI, YI = np.meshgrid(xi, yi)
-    EI = griddata((x_data, y_data), eff_data, (XI, YI), method="linear")
-
+    # BEP from raw data (before interpolation)
     bep_idx   = np.nanargmax(eff_data)
     bep_x     = float(x_data[bep_idx])
     bep_y     = float(y_data[bep_idx])
-    bep_eta   = float(eff_data[bep_idx])
+    bep_eta   = float(eff_data[bep_idx])       # fraction [0,1]
+    bep_eta_pct = bep_eta * 100.0              # percent
 
-    # Contour levels: from (bep - several steps) down to slightly above 0
-    eta_start  = max(contour_step, round(bep_eta - 10 * contour_step, 4))
-    eta_end    = bep_eta
-    contour_levels = list(np.arange(eta_start, eta_end + 1e-9, contour_step))
+    # 2-D grid: efficiency percentage in [0,100]
+    xi = np.linspace(x_data.min(), x_data.max(), grid_n)
+    yi = np.linspace(y_data.min(), y_data.max(), grid_n)
+    XI, YI = np.meshgrid(xi, yi)
 
-    # Plotly Contour (on secondary=False, so it shares the left Y axis)
+    # method='linear' fills NaN outside the convex hull → no extrapolation
+    EI_raw = griddata((x_data, y_data), eff_data, (XI, YI), method="linear")
+    EI_pct = EI_raw * 100.0   # now in % units, NaN outside hull
+
+    # Contour levels: from (BEP - N steps) up to BEP, in percent
+    step = contour_step_pct
+    eta_start_pct = max(step, round(bep_eta_pct - 10 * step, 1))
+    # Round BEP down to nearest step for clean levels
+    bep_floor_pct = float(np.floor(bep_eta_pct / step) * step)
+    levels = np.arange(eta_start_pct, bep_floor_pct + 0.001, step).tolist()
+
+    if not levels:
+        return fig
+
+    # Contour trace — smooth lines, open boundaries (NaN → gap)
     fig.add_trace(
         go.Contour(
-            x=xi, y=yi, z=EI,
+            x=xi, y=yi, z=EI_pct,
             contours=dict(
-                start=min(contour_levels),
-                end=bep_eta,
-                size=contour_step,
+                start=levels[0],
+                end=levels[-1],
+                size=step,
                 coloring="lines",
                 showlabels=True,
                 labelfont=dict(size=10, color="darkgreen"),
+                labelformat=".0f",        # show integer %, e.g. "83"
             ),
             colorscale=[[0, "lightgreen"], [1, "darkgreen"]],
             showscale=False,
-            line=dict(width=1.5),
-            name="Iso-efficiency",
-            opacity=0.8,
+            line=dict(width=1.5, smoothing=1.3),   # smooth contour lines
+            connectgaps=False,                      # NO interpolation where NaN
+            name="Iso-efficiency (%)",
+            hovertemplate="Eff: %{z:.1f}%<extra></extra>",
+            opacity=0.85,
         ),
         secondary_y=False,
     )
@@ -119,10 +134,10 @@ def _add_efficiency_contours(
             mode="markers+text",
             marker=dict(symbol="star", size=18, color="gold",
                         line=dict(color="darkorange", width=1.5)),
-            text=[f"BEP {bep_eta*100:.1f}%"],
+            text=[f"BEP {bep_eta_pct:.1f}%"],
             textposition="top right",
             textfont=dict(size=11, color="darkorange"),
-            name=f"BEP ({bep_eta*100:.1f}%)",
+            name=f"BEP ({bep_eta_pct:.1f}%)",
         ),
         secondary_y=False,
     )
@@ -141,11 +156,11 @@ def create_performance_curve(
     y2_label: str = "Shaft Power",
     smooth_level: float = 3.0,
     show_efficiency: bool = False,
-    eff_contour_step: float = 0.02,
+    eff_contour_step: float = 2.0,   # percent (2 or 5)
 ) -> go.Figure:
     """
     Render a professional fan performance map with smooth fitted curves.
-    Optionally overlay iso-efficiency contours and BEP marker.
+    Optionally overlay smooth iso-efficiency contours and BEP marker.
     """
     fig = make_subplots(specs=[[{"secondary_y": True}]])
 
@@ -203,7 +218,8 @@ def create_performance_curve(
     if show_efficiency and "efficiency" in df.columns:
         fig = _add_efficiency_contours(
             fig, df, x_col=x_col, y_col=y1_col,
-            eff_col="efficiency", contour_step=eff_contour_step,
+            eff_col="efficiency",
+            contour_step_pct=eff_contour_step,   # already in percent (2.0 or 5.0)
         )
 
     # Layout
