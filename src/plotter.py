@@ -354,8 +354,8 @@ def create_performance_curve(
                      showticklabels=show_power)
     return fig
 
-def create_axial_force_curve(df: pd.DataFrame, x_col: str, force_col: str, max_bearing_load: float, flow_unit: str) -> go.Figure:
-    """绘制轴向力曲线并添加安全承载报警线。"""
+def create_axial_force_curve(df: pd.DataFrame, x_col: str, force_col: str, flow_unit: str) -> go.Figure:
+    """绘制轴向力曲线，支持 Y 轴自由动态缩放。"""
     fig = go.Figure()
     
     unique_speeds = sorted(df["speed_rpm"].unique(), reverse=True)
@@ -373,22 +373,7 @@ def create_axial_force_curve(df: pd.DataFrame, x_col: str, force_col: str, max_b
             marker=dict(size=6, symbol='circle')
         ))
         
-    # 添加安全报警线
-    fig.add_hline(y=max_bearing_load, line_dash="dash", line_color="#FF3B30",
-                  annotation_text="最大正向极限载荷", annotation_position="top right", annotation_font_color="#FF3B30")
-    fig.add_hline(y=-max_bearing_load, line_dash="dash", line_color="#FF3B30",
-                  annotation_text="最大反向极限载荷", annotation_position="bottom right", annotation_font_color="#FF3B30")
     fig.add_hline(y=0, line_color="#555555", line_width=1)
-    
-    # 将超出极限的区域涂红
-    max_flow = df[x_col].max() * 1.05
-    min_flow = df[x_col].min() * 0.95
-    fig.add_shape(type="rect",
-                  x0=min_flow, y0=max_bearing_load, x1=max_flow, y1=max_bearing_load*1.5,
-                  fillcolor="rgba(255, 59, 48, 0.1)", line_width=0, layer="below")
-    fig.add_shape(type="rect",
-                  x0=min_flow, y0=-max_bearing_load, x1=max_flow, y1=-max_bearing_load*1.5,
-                  fillcolor="rgba(255, 59, 48, 0.1)", line_width=0, layer="below")
 
     fig.update_layout(
         title_text="总轴向力特性分析图 (F_total = F_backplate - F_blade_hub)", title_font_size=16,

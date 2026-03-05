@@ -373,21 +373,17 @@ if uploaded_file:
                 key="a_hole_cm2", on_change=save_pref, args=("a_hole_cm2",),
                 help="影响泄压效果的关键几何参数，面积越大内腔压力越趋近于入口压力，直接决定合力方向。"
             )
-            alpha_hole = st.sidebar.slider(
+            alpha_hole = st.sidebar.number_input(
                 "泄压系数 α", min_value=0.0, max_value=1.0, value=st.session_state.get("alpha_hole", 0.3), step=0.05,
                 key="alpha_hole", on_change=save_pref, args=("alpha_hole",),
                 help="反映平衡孔流动阻力与压力平衡能力的工程修正值。"
             )
             
-        k_factor = st.sidebar.slider(
+        k_factor = st.sidebar.number_input(
             "流体旋转因子 k", min_value=0.0, max_value=1.0, value=st.session_state.get("k_factor", 0.15), step=0.05,
             key="k_factor", on_change=save_pref, args=("k_factor",),
             help="背板腔体流体角速度与叶轮角速度之比，决定径向压力下降梯度。"
         )
-        
-        st.sidebar.markdown("---")
-        st.sidebar.subheader("安全与报警界限")
-        max_bearing_load = st.sidebar.number_input("轴承极限载荷 (N)", value=5000.0, step=100.0)
         
         if "axial_force" not in df.columns:
             st.warning("⚠️ 你的 CSV 数据中未提供 '轴向力(N)' 列，无法计算总轴向力。")
@@ -424,16 +420,19 @@ if uploaded_file:
             # 绘图容器
             plot_c = st.container(border=True)
             from plotter import create_axial_force_curve
-            fig = create_axial_force_curve(df, "display_flow", "f_total", max_bearing_load, flow_unit)
+            fig = create_axial_force_curve(df, "display_flow", "f_total", flow_unit)
             plot_c.plotly_chart(fig, use_container_width=True)
             
-            # 安全警报诊断区
-            alerts_df = df[ (df["f_total"].abs() > max_bearing_load) | (df["f_total"] < 0) ]
-            if not alerts_df.empty:
-                st.error("🚨 **发现不安全工况区域！** 存在总力反向或超过轴承承载能力的点！")
-                st.dataframe(alerts_df[["speed_rpm", "display_flow", "axial_force", "f_backplate", "f_total"]].style.highlight_max(axis=0, color='red'))
-            else:
-                st.success("✅ **当前几何与工况下安全**：所有工作点轴向力都在设计承载包络内，且方向始终维持稳定。")
+            # 动态数据表展示
+            with st.expander("📋 查看轴向力计算核心数据", expanded=False):
+                show_cols = ["speed_rpm", "display_flow", "axial_force", "f_backplate", "f_total"]
+                out_df = df[show_cols].copy()
+                st.dataframe(out_df.rename(columns={
+                    "speed_rpm": "转速 (RPM)", "display_flow": f"流量 ({flow_unit})",
+                    "axial_force": "前板推力 [N] (Motor->Inlet)", 
+                    "f_backplate": "背板推力 [N]", 
+                    "f_total": "净合力 [N]"
+                }))
 
 else:
     st.info("👈 请从左侧导入 CSV 数据文件开始。")
