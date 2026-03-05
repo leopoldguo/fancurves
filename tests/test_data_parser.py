@@ -42,27 +42,24 @@ def test_filter_operating_points_with_interpolation():
     
     # Should have p=1.2 (inside) and p=1.1 (interpolated)
     assert len(filtered_df) == 2
-    assert 1.1 in filtered_df["pressure_ratio"].values
-    assert 15.0 in filtered_df["display_flow"].values
-    assert 150.0 in filtered_df["shaft_power"].values
+    assert any(abs(v - 1.1) < 1e-4 for v in filtered_df["pressure_ratio"].values)
+    assert any(abs(v - 15.0) < 1e-4 for v in filtered_df["display_flow"].values)
+    assert any(abs(v - 150.0) < 1e-4 for v in filtered_df["shaft_power"].values)
 
 def test_filter_operating_points_with_surge_interpolation():
-    # Linear surge line: flow = 1 * pressure + 0 (f=p)
-    # Surging if flow < pressure
-    df = pd.DataFrame({
-        "speed_rpm": [1000, 2000],
-        "display_flow": [1.0, 2.0],
-        "pressure_ratio": [1.0, 2.0]
-    })
+    # Operating data
+    # We provide points that will form anchors:
+    # 1000 RPM: max p=1.0 at f=1.0, anchor: p=1.0, f=0.95
+    # 1500 RPM: max p=2.0 at f=0.0, anchor: p=2.0, f=0.0
+    # 2000 RPM: max p=2.0 at f=2.0, anchor: p=2.0, f=1.9
     
-    # Operating data for 1500 RPM
-    # Segment from (f=0, p=2) to (f=2, p=1)
-    # Surging at f < p. 
-    # Point 1: f=0, p=2 (Surging)
-    # Point 2: f=2, p=1 (Safe)
-    # Intersection with surge line f=p:
-    # Segment: f - 0 = k * (p - 2) where k = (2-0)/(1-2) = -2
-    # f = -2p + 4. Search f=p -> p = -2p + 4 -> 3p = 4 -> p = 1.333, f = 1.333
+    # Auto-surge bounds anchors.
+    # Line between 1000 RPM anchor (1.0, 0.95) and 2000 RPM anchor (2.0, 1.9):
+    # m = (1.9 - 0.95)/(2.0 - 1.0) = 0.95, b = 0
+    # Line is Q = 0.95 * P (bounds the 1500 RPM perfectly)
+    
+    # 1500 RPM curve: Q = -2P + 4
+    # Intersects Q = 0.95 P -> 0.95 P = -2P + 4 -> 2.95 P = 4 -> P = 1.3559, Q = 1.288
     
     op_df = pd.DataFrame({
         "speed_rpm": [1000, 2000, 1500, 1500],
@@ -72,8 +69,8 @@ def test_filter_operating_points_with_surge_interpolation():
     
     filtered_df, surge_line_df = filter_operating_points(op_df, flow_col="display_flow", pressure_col="pressure_ratio", min_pressure=0.0)
     
-    # 1500 RPM should have the Safe point (2, 1) and the interpolated Surge point (~1.33, ~1.33)
     speed_1500 = filtered_df[filtered_df["speed_rpm"] == 1500]
     assert len(speed_1500) == 2
-    # Check if interpolated point exists (f approx 1.33)
-    assert any(abs(v - 1.333) < 0.01 for v in speed_1500["display_flow"])
+    
+    # Check if interpolated point exists (f approx 1.288)
+    assert any(abs(v - 1.288) < 0.01 for v in speed_1500["display_flow"])

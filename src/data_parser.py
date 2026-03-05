@@ -117,18 +117,75 @@ def filter_operating_points(
         return df, pd.DataFrame()
 
     surge_points = []
+    truncated_rows = []
+    
+    # Pre-process: truncation and anchor points
     for speed in sorted(df["speed_rpm"].unique()):
-        speed_df = df[df["speed_rpm"] == speed]
-        surge_points.append(speed_df.loc[speed_df[flow_col].idxmin()])
+        speed_df = df[df["speed_rpm"] == speed].sort_values(by=flow_col)
+        if len(speed_df) == 0:
+            continue
+            
+        # Find the point of maximum pressure
+        max_p_idx = speed_df[pressure_col].idxmax()
+        max_p_val = speed_df.loc[max_p_idx, pressure_col]
+        max_p_flow = speed_df.loc[max_p_idx, flow_col]
+        
+        # Discard points to the left of the maximum pressure peak (where pressure dropped)
+        speed_df_valid = speed_df[speed_df[flow_col] >= max_p_flow]
+        truncated_rows.append(speed_df_valid)
+        
+        # Calculate the 95% flow anchor for maximum operating pressure
+        anchor_flow = max_p_flow * 0.95
+        surge_points.append({
+            "speed_rpm": speed,
+            flow_col: anchor_flow,
+            pressure_col: max_p_val
+        })
+        
+    df = pd.concat(truncated_rows, ignore_index=True)
     surge_df = pd.DataFrame(surge_points).sort_values(by="speed_rpm")
 
     m_surge, b_surge = None, None
     if len(surge_df) >= 2:
-        p_lo, f_lo = surge_df.iloc[0][pressure_col], surge_df.iloc[0][flow_col]
-        p_hi, f_hi = surge_df.iloc[-1][pressure_col], surge_df.iloc[-1][flow_col]
-        if p_hi != p_lo:
-            m_surge = (f_hi - f_lo) / (p_hi - p_lo)
-            b_surge = f_lo - m_surge * p_lo
+        valid_lines = []
+        n_anchors = len(surge_df)
+        # Try all pairs to find a line that conservatively bounds all anchors to the left.
+        # i.e., Q_anchor <= m * P_anchor + b for all points.
+        for i in range(n_anchors):
+            for j in range(i + 1, n_anchors):
+                pi, qi = surge_df.iloc[i][pressure_col], surge_df.iloc[i][flow_col]
+                pj, qj = surge_df.iloc[j][pressure_col], surge_df.iloc[j][flow_col]
+                if abs(pi - pj) > 1e-9:
+                    m = (qi - qj) / (pi - pj)
+                    b = qi - m * pi
+                    
+                    is_safe = True
+                    for k in range(n_anchors):
+                        pk = surge_df.iloc[k][pressure_col]
+                        qk = surge_df.iloc[k][flow_col]
+                        if qk > m * pk + b + 1e-6:
+                            is_safe = False
+                            break
+                    if is_safe:
+                        valid_lines.append((m, b))
+        
+        if valid_lines:
+            # Pick the line with the smallest slope (steepest in P vs Q, most vertical bounding line)
+            m_surge, b_surge = min(valid_lines, key=lambda x: abs(x[0]))
+        else:
+            # Fallback: simple linear regression shifted to the right to be conservative
+            from scipy.stats import linregress
+            slope, intercept, _, _, _ = linregress(surge_df[pressure_col], surge_df[flow_col])
+            m_surge = slope
+            b_surge = intercept
+            max_shift = 0.0
+            for k in range(n_anchors):
+                pk = surge_df.iloc[k][pressure_col]
+                qk = surge_df.iloc[k][flow_col]
+                shift = qk - (m_surge * pk + b_surge)
+                if shift > max_shift:
+                    max_shift = shift
+            b_surge += max_shift
 
     def _interp(p1: dict, p2: dict, ratio: float) -> dict:
         return {col: p1[col] + ratio * (p2[col] - p1[col])
