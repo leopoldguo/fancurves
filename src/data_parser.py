@@ -4,14 +4,15 @@ HEADER_MAP = {
     "进口流量": "mass_flow",
     "压比": "pressure_ratio",
     "轴功率": "shaft_power",
-    "设定转速": "speed_rpm"
+    "设定转速": "speed_rpm",
+    "等熵效率": "efficiency_pct",   # CFX provides this directly (unit: %)
 }
 
 P_ATM_KPA       = 101.325    # kPa
 P_ATM_PA        = 101325.0   # Pa
 AIR_DENSITY_20C = 1.204      # kg/m³ at 20°C, 1 atm
 
-# Isentropic efficiency constants (air, dry)
+# Isentropic efficiency constants (only used as fallback when CSV lacks η column)
 _GAMMA = 1.4
 _CP    = 1005.0    # J/(kg·K)
 _T_IN  = 293.15    # K = 20°C
@@ -67,31 +68,35 @@ def convert_pressure_ratio_to_kpa(pressure_ratio_series: pd.Series, mode: str) -
 
 def compute_efficiency(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Compute fan isentropic (total-to-total) efficiency for each row.
+    填入内部统一的 'efficiency' 列（小数，[0,1] 范围）。
 
-    Formula (compressible, isentropic):
-        η_is = ṁ · cp · T_in · [(PR)^((γ-1)/γ) - 1] / P_shaft
-
-    Parameters:
-        T_in = 293.15 K (20°C), cp = 1005 J/(kg·K), γ = 1.4 (dry air)
-
-    This is physically correct for centrifugal fans/compressors and avoids
-    the ~4% overestimation of the simpler incompressible formula Q·ΔP/P.
-
-    Requires columns: mass_flow (kg/s), pressure_ratio (-), shaft_power (kW).
-    Adds column 'efficiency' in [0, 1].
+    优先级：
+    1. 直接使用 CSV 中 CFX 计算好的「等熵效率(%)」列（efficiency_pct），
+       除以 100 转为小数。这是最准确的来源，无需重新计算。
+    2. 若 CSV 中没有效率列，则用等熵效率公式作为后备：
+           η = ṁ · cp · Tin · [(PR)^((γ-1)/γ) - 1] / P_shaft
     """
     result = df.copy()
+
+    # --- 优先：直接从 CSV 中读取 ---
+    if "efficiency_pct" in result.columns:
+        # CSV stores efficiency as % (e.g. 80.5). Convert to fraction [0, 1].
+        result["efficiency"] = pd.to_numeric(result["efficiency_pct"],
+                                             errors="coerce").clip(0, 100) / 100.0
+        return result
+
+    # --- 后备：isentropic formula ---
     try:
-        exponent = (_GAMMA - 1.0) / _GAMMA          # (γ-1)/γ = 2/7 for air
-        W_is = (result["mass_flow"]
-                * _CP
-                * _T_IN
-                * (result["pressure_ratio"] ** exponent - 1.0))   # W
-        W_shaft = result["shaft_power"] * 1000.0                   # W
+        exponent = (_GAMMA - 1.0) / _GAMMA
+        W_is     = (result["mass_flow"]
+                    * _CP
+                    * _T_IN
+                    * (result["pressure_ratio"] ** exponent - 1.0))
+        W_shaft  = result["shaft_power"] * 1000.0
         result["efficiency"] = (W_is / W_shaft).clip(0, 1)
     except KeyError:
         result["efficiency"] = float("nan")
+
     return result
 
 def filter_operating_points(
@@ -103,10 +108,10 @@ def filter_operating_points(
     power_col: str = "shaft_power"
 ):
     """
-    Filters operating points with linear interpolation at boundaries:
-    - Drops/interpolates at the minimum pressure threshold.
-    - Drops/interpolates at the linear surge line boundary.
-    - Optionally drops/interpolates at the maximum shaft power threshold.
+    Filters operating points with linear interpolation at boundaries.
+    Phase A: minimum pressure threshold
+    Phase B: maximum shaft power threshold (optional)
+    Phase C: surge line
     """
     if "speed_rpm" not in df.columns or df.empty:
         return df, pd.DataFrame()

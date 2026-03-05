@@ -70,14 +70,18 @@ if uploaded_file:
         st.error("未能识别压力列，请确保 CSV 包含'压比'等关键词。")
         st.stop()
 
-    # ─── 计算效率（过滤前，基于原始数据） ────────────────────────────────────
-    has_efficiency = (
-        "mass_flow"      in df.columns and
-        pressure_raw_col in df.columns and
-        power_col        in df.columns
-    )
+    # ─── 效率：优先 CSV 直接值，否则等熵公式 ────────────────────────────────
+    # CSV 中有 efficiency_pct（等熵效率%）→ 直接用（最准确）
+    # 否则需要 mass_flow + pressure_ratio + shaft_power → 公式计算
+    can_use_csv_eff     = "efficiency_pct" in df.columns
+    can_compute_eff     = ("mass_flow" in df.columns and
+                           pressure_raw_col in df.columns and
+                           power_col in df.columns)
+    has_efficiency      = can_use_csv_eff or can_compute_eff
+
     if has_efficiency:
-        df = compute_efficiency(df)
+        df = compute_efficiency(df)   # fills 'efficiency' column [0,1]
+        eff_source = "CSV 等熵效率列（直接值）" if can_use_csv_eff else "等熵公式计算值"
 
     # ─── 过滤阈值控件 ─────────────────────────────────────────────────────────
     st.sidebar.markdown("---")
@@ -137,7 +141,7 @@ if uploaded_file:
     st.sidebar.markdown("---")
     st.sidebar.subheader("最佳效率点 & 等效率线")
     show_efficiency = False
-    eff_contour_step = 2.0   # percent (2.0 or 5.0)
+    eff_contour_step = 2.0
     if has_efficiency:
         show_efficiency = st.sidebar.checkbox(
             "显示等效率曲线 & BEP", value=False,
@@ -145,21 +149,18 @@ if uploaded_file:
         )
         if show_efficiency:
             step_label = st.sidebar.radio(
-                "等效率线间距",
-                ["2%", "5%"],
-                horizontal=True
+                "等效率线间距", ["2%", "5%"], horizontal=True
             )
-            eff_contour_step = 2.0 if step_label == "2%" else 5.0  # percent, NOT fraction
+            eff_contour_step = 2.0 if step_label == "2%" else 5.0
     else:
-        st.sidebar.info("CSV 缺少效率计算所需列（进口流量、压比、轴功率），无法显示等效率线。")
+        st.sidebar.info("CSV 缺少效率相关列，无法显示等效率线。")
 
     # ─── 曲线平滑度 ───────────────────────────────────────────────────────────
     st.sidebar.markdown("---")
     st.sidebar.subheader("曲线平滑度")
     smooth_level = st.sidebar.slider(
-        "平滑强度",
-        min_value=0.0, max_value=10.0, value=3.0, step=0.5,
-        help="0 = 精确过每点；3 = 推荐；10 = 最高平滑（经典风机图谱效果）"
+        "平滑强度", min_value=0.0, max_value=10.0, value=3.0, step=0.5,
+        help="0 = 精确过每点；3 = 推荐；10 = 最高平滑"
     )
 
     # ─── X 轴范围 ────────────────────────────────────────────────────────────
@@ -197,14 +198,16 @@ if uploaded_file:
         )
         st.plotly_chart(fig, use_container_width=True)
 
-        # BEP 信息卡
+        # BEP info card
         if show_efficiency and has_efficiency and "efficiency" in final_df.columns:
             bep_row = final_df.loc[final_df["efficiency"].idxmax()]
             col1, col2, col3, col4 = st.columns(4)
             col1.metric("🏆 BEP 效率", f"{bep_row['efficiency']*100:.1f}%")
-            col2.metric("流量 (BEP)", f"{bep_row['display_flow']:.3f} {flow_unit}")
+            col2.metric(f"流量 (BEP)", f"{bep_row['display_flow']:.3f} {flow_unit}")
             col3.metric("压力 (BEP)", f"{bep_row['display_pressure']:.4f}")
             col4.metric("转速 (BEP)", f"{int(bep_row['speed_rpm'])} RPM")
+            if has_efficiency:
+                st.caption(f"效率数据来源：{eff_source}")
 
         st.info("💡 将鼠标悬停在图表右上角，点击相机图标可下载高清 PNG 图片。")
 
@@ -219,9 +222,8 @@ if uploaded_file:
                 "display_flow": f"流量 ({flow_unit})",
                 "display_pressure": y1_label,
                 power_col: "轴功率 (kW)",
-                "efficiency": "效率 [%]"
+                "efficiency": "等熵效率 [%]"
             }
-            # Show efficiency as percentage in table
             show_df = final_df[display_cols].copy()
             if "efficiency" in show_df.columns:
                 show_df["efficiency"] = (show_df["efficiency"] * 100).round(2)
