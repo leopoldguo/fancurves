@@ -140,8 +140,8 @@ def filter_operating_points(
         speed_df_valid = speed_df[speed_df[flow_col] >= max_p_flow]
         truncated_rows.append(speed_df_valid)
         
-        # Calculate the 95% flow anchor for maximum operating pressure
-        anchor_flow = max_p_flow * 0.95
+        # Calculate the 1.1x flow anchor for maximum operating pressure
+        anchor_flow = max_p_flow * 1.1
         surge_points.append({
             "speed_rpm": speed,
             flow_col: anchor_flow,

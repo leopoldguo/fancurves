@@ -49,17 +49,17 @@ def test_filter_operating_points_with_interpolation():
 def test_filter_operating_points_with_surge_interpolation():
     # Operating data
     # We provide points that will form anchors:
-    # 1000 RPM: max p=1.0 at f=1.0, anchor: p=1.0, f=0.95
+    # 1000 RPM: max p=1.0 at f=1.0, anchor: p=1.0, f=1.1
     # 1500 RPM: max p=2.0 at f=0.0, anchor: p=2.0, f=0.0
-    # 2000 RPM: max p=2.0 at f=2.0, anchor: p=2.0, f=1.9
+    # 2000 RPM: max p=2.0 at f=2.0, anchor: p=2.0, f=2.2
     
     # Auto-surge bounds anchors.
-    # Line between 1000 RPM anchor (1.0, 0.95) and 2000 RPM anchor (2.0, 1.9):
-    # m = (1.9 - 0.95)/(2.0 - 1.0) = 0.95, b = 0
-    # Line is Q = 0.95 * P (bounds the 1500 RPM perfectly)
+    # Line between 1000 RPM anchor (1.0, 1.1) and 2000 RPM anchor (2.0, 2.2):
+    # m = (2.2 - 1.1)/(2.0 - 1.0) = 1.1, b = 0
+    # Line is Q = 1.1 * P (bounds the 1500 RPM perfectly)
     
     # 1500 RPM curve: Q = -2P + 4
-    # Intersects Q = 0.95 P -> 0.95 P = -2P + 4 -> 2.95 P = 4 -> P = 1.3559, Q = 1.288
+    # Intersects Q = 1.1 P -> 1.1 P = -2P + 4 -> 3.1 P = 4 -> P = 1.2903, Q = 1.419
     
     op_df = pd.DataFrame({
         "speed_rpm": [1000, 2000, 1500, 1500],
@@ -72,5 +72,5 @@ def test_filter_operating_points_with_surge_interpolation():
     speed_1500 = filtered_df[filtered_df["speed_rpm"] == 1500]
     assert len(speed_1500) == 2
     
-    # Check if interpolated point exists (f approx 1.288)
-    assert any(abs(v - 1.288) < 0.01 for v in speed_1500["display_flow"])
+    # Check if interpolated point exists (f approx 1.419)
+    assert any(abs(v - 1.419) < 0.01 for v in speed_1500["display_flow"])
