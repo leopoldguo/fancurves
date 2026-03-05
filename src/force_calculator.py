@@ -75,15 +75,17 @@ def calculate_backplate_force(
         F2 = math.pi * (R_s2**2 - R_in**2) * term_2_const \
              + 0.25 * math.pi * rho * (omega_fluid**2) * (R_s2**4 - R_in**4)
              
-    # --- 大气环境背板外侧推力 ---
-    # 大气压作用在背板非气动测，反推向叶轮侧，方向为负。
-    F_ambient_back = - (math.pi * (R_out**2 - R_in**2) * p_ambient_pa)
-    
-    total_backplate_force = F1 + F2 + F_ambient_back
+    # --- 最终背板推力 (绝对压力积分) ---
+    # 因为叶轮前盖板(Blade+Hub)的受力是 CFX 基于绝对压力给出的积分值，
+    # 我们这里也必须维持纯粹的绝对气压积分，不再额外减除背面的大气压(除非有暴露界面)。
+    total_backplate_force = F1 + F2
     return total_backplate_force
 
 def calculate_total_axial_force(force_blade_and_hub_n: float, force_backplate_n: float) -> float:
     """
-    总轴向合力: 注意力系方向已在解析层面约定
+    总轴向合力: 
+    force_backplate_n 推向入口（正）
+    force_blade_and_hub_n 已经被 data_parser 反转为了负值（即推向电机）
+    直接相加即为净合力。
     """
-    return force_backplate_n - force_blade_and_hub_n
+    return force_backplate_n + force_blade_and_hub_n
