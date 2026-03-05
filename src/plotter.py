@@ -27,7 +27,7 @@ def _smooth_series(x, y, n_points=_SMOOTH_POINTS, smooth_level=3.0):
     if smooth_level <= 0.0:
         s = 0.0
     else:
-        multiplier = 0.05 * (10 ** (smooth_level / 10 * np.log10(100)))
+        multiplier = 0.01 * smooth_level
         s = auto_s * multiplier
     try:
         sp = UnivariateSpline(xs, ys, s=s, k=3, ext=3)
@@ -66,7 +66,7 @@ def _smooth_path(px, py, n_pts=_CONTOUR_PTS, smooth_level=5.0):
     if smooth_level <= 0.0:
         s = 0.0
     else:
-        multiplier = 0.05 * (10 ** (smooth_level / 10 * np.log10(100)))
+        multiplier = 0.01 * smooth_level
         s = auto_s * multiplier
 
     try:
