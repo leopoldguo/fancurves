@@ -15,8 +15,6 @@ from src.data_parser import convert_flow_units
 
 def test_convert_flow_units():
     # 1 kg/s 转换到 m^3/min (假设标准空气密度 ~1.225 kg/m^3，或作为特定配置传入)
-    # 因为密度可变，我们可以测试一个标称转换或者将密度作为参数传入。
-    # 对于 CFM: 1 m^3/min = 35.3147 CFM
     val_kg_s = 1.225
     val_m3_min = convert_flow_units(val_kg_s, from_unit="kg/s", to_unit="m3/min", density=1.225)
     assert round(val_m3_min, 2) == 60.00
@@ -26,20 +24,56 @@ def test_convert_flow_units():
 
 from src.data_parser import filter_operating_points
 
-def test_filter_operating_points():
+def test_filter_operating_points_with_interpolation():
+    # Test pressure threshold interpolation
     df = pd.DataFrame({
-        "speed_rpm": [1000, 1000, 2000, 2000],
-        "display_flow": [0.5, 1.0, 1.5, 2.0],
-        "pressure_ratio": [1.2, 1.1, 1.8, 1.5]
+        "speed_rpm": [1000, 1000],
+        "display_flow": [10.0, 20.0],
+        "pressure_ratio": [1.2, 1.0], # Segment crosses 1.1
+        "shaft_power": [100, 200]
     })
     
-    # 喘振点将通过最低流量找到：1000转 (0.5, 1.2), 2000转 (1.5, 1.8)
-    # 假设我们设定最低压比为 1.15，那么点 (1.0, 1.1) 应该被过滤掉
+    # Target min_pressure = 1.1. Middle should be interpolated.
+    # p = 1.1 is halfway between 1.2 and 1.0. 
+    # Flow should be halfway between 10 and 20 -> 15.0
+    # Power should be halfway between 100 and 200 -> 150.0
     
-    filtered_df, surge_line_df = filter_operating_points(df, flow_col="display_flow", pressure_col="pressure_ratio", min_pressure=1.15)
+    filtered_df, surge_line_df = filter_operating_points(df, flow_col="display_flow", pressure_col="pressure_ratio", min_pressure=1.1)
     
-    assert len(filtered_df) == 3
-    assert 1.1 not in filtered_df["pressure_ratio"].values
+    # Should have p=1.2 (inside) and p=1.1 (interpolated)
+    assert len(filtered_df) == 2
+    assert 1.1 in filtered_df["pressure_ratio"].values
+    assert 15.0 in filtered_df["display_flow"].values
+    assert 150.0 in filtered_df["shaft_power"].values
+
+def test_filter_operating_points_with_surge_interpolation():
+    # Linear surge line: flow = 1 * pressure + 0 (f=p)
+    # Surging if flow < pressure
+    df = pd.DataFrame({
+        "speed_rpm": [1000, 2000],
+        "display_flow": [1.0, 2.0],
+        "pressure_ratio": [1.0, 2.0]
+    })
     
-    # 检查喘振线是否包含两个点
-    assert len(surge_line_df) == 2
+    # Operating data for 1500 RPM
+    # Segment from (f=0, p=2) to (f=2, p=1)
+    # Surging at f < p. 
+    # Point 1: f=0, p=2 (Surging)
+    # Point 2: f=2, p=1 (Safe)
+    # Intersection with surge line f=p:
+    # Segment: f - 0 = k * (p - 2) where k = (2-0)/(1-2) = -2
+    # f = -2p + 4. Search f=p -> p = -2p + 4 -> 3p = 4 -> p = 1.333, f = 1.333
+    
+    op_df = pd.DataFrame({
+        "speed_rpm": [1000, 2000, 1500, 1500],
+        "display_flow": [1.0, 2.0, 0.0, 2.0],
+        "pressure_ratio": [1.0, 2.0, 2.0, 1.0] 
+    })
+    
+    filtered_df, surge_line_df = filter_operating_points(op_df, flow_col="display_flow", pressure_col="pressure_ratio", min_pressure=0.0)
+    
+    # 1500 RPM should have the Safe point (2, 1) and the interpolated Surge point (~1.33, ~1.33)
+    speed_1500 = filtered_df[filtered_df["speed_rpm"] == 1500]
+    assert len(speed_1500) == 2
+    # Check if interpolated point exists (f approx 1.33)
+    assert any(abs(v - 1.333) < 0.01 for v in speed_1500["display_flow"])
