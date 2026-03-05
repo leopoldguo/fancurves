@@ -136,8 +136,10 @@ if uploaded_file:
     if "mass_flow" not in df.columns:
         st.error("未识别流量列"); st.stop()
 
-    df["display_flow"] = df["mass_flow"].apply(
-        lambda x: convert_flow_units(x, "kg/s", flow_unit, density=AIR_DENSITY_20C)
+    # 流量单位换算：使用每行动态密度 rho（真空工况支持）
+    df["display_flow"] = df.apply(
+        lambda row: convert_flow_units(row["mass_flow"], "kg/s", flow_unit, density=row["rho"]),
+        axis=1
     )
 
     pressure_raw_col = "pressure_ratio"
@@ -196,15 +198,26 @@ if uploaded_file:
                 st.text(f"{spd} RPM: 取最大值 PR={info['pressure']:.4f} @ Flow={info['flow']:.4f}")
             st.markdown("*注：系统自动舍去了流量小于最高压力点的所有「压降」散点数据。图表中曲线在最高压力点左侧的下垂，通常是由于插值算法(Spline)在平滑连接时的视觉过冲导致，并非真实残留数据。*")
 
-        # 压力单位换算（显示层）
+        # 压力单位换算（显示层）——基于每行入口绝对压力
         filtered_df = filtered_df.copy()
-        filtered_df["display_pressure"] = convert_pressure_ratio_to_kpa(
-            filtered_df[pressure_raw_col], pressure_mode
+        
+        def row_pressure_display(row, mode):
+            pr = row[pressure_raw_col]
+            p_in = row["p_in_pa"]  # 真实入口绝对压力 (Pa)
+            if mode == "delta_kPa":
+                return (pr - 1.0) * (p_in / 1000.0)  # 差压 = (PR-1) * P_in
+            elif mode == "abs_kPa":
+                return pr * (p_in / 1000.0)           # 出口绝压 = PR * P_in
+            else:
+                return pr                              # 纯压比无需修正
+
+        filtered_df["display_pressure"] = filtered_df.apply(
+            lambda row: row_pressure_display(row, pressure_mode), axis=1
         )
         if not surge_line_df.empty:
             surge_line_df = surge_line_df.copy()
-            surge_line_df["display_pressure"] = convert_pressure_ratio_to_kpa(
-                surge_line_df[pressure_raw_col], pressure_mode
+            surge_line_df["display_pressure"] = surge_line_df.apply(
+                lambda row: row_pressure_display(row, pressure_mode), axis=1
             )
 
         # ─── 显示选项 ─────────────────────────────────────────────────────────────
