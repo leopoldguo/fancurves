@@ -14,18 +14,13 @@ _CONTOUR_PTS   = 600
 
 # ─── Performance curve smoothing ─────────────────────────────────────────────
 
-def _smooth_series(
-    x: np.ndarray,
-    y: np.ndarray,
-    n_points: int = _SMOOTH_POINTS,
-    smooth_level: float = 3.0,
-) -> tuple:
+def _smooth_series(x, y, n_points=_SMOOTH_POINTS, smooth_level=3.0):
     if len(x) < 4:
         return x, y
     order = np.argsort(x)
     xs, ys = x[order], y[order]
-    _, unique_idx = np.unique(xs, return_index=True)
-    xs, ys = xs[unique_idx], ys[unique_idx]
+    _, ui = np.unique(xs, return_index=True)
+    xs, ys = xs[ui], ys[ui]
     if len(xs) < 4:
         return xs, ys
     auto_s = max(float(len(ys)) * float(np.var(ys)), 1e-10)
@@ -35,107 +30,72 @@ def _smooth_series(
         multiplier = 0.05 * (10 ** (smooth_level / 10 * np.log10(100)))
         s = auto_s * multiplier
     try:
-        spline = UnivariateSpline(xs, ys, s=s, k=3, ext=3)
-        x_fine = np.linspace(xs[0], xs[-1], n_points)
-        return x_fine, spline(x_fine)
+        sp = UnivariateSpline(xs, ys, s=s, k=3, ext=3)
+        return np.linspace(xs[0], xs[-1], n_points), sp(np.linspace(xs[0], xs[-1], n_points))
     except Exception:
         return xs, ys
 
 
 # ─── Iso-efficiency contour helpers ──────────────────────────────────────────
 
-def _is_closed_path(px: np.ndarray, py: np.ndarray, threshold: float = 0.02) -> bool:
+def _is_closed_path(px, py, threshold=0.02):
     path_len = float(np.sum(np.sqrt(np.diff(px)**2 + np.diff(py)**2)))
-    endpoint_dist = float(np.sqrt((px[0] - px[-1])**2 + (py[0] - py[-1])**2))
-    return path_len > 1e-12 and endpoint_dist < threshold * path_len
+    ep_dist  = float(np.sqrt((px[0]-px[-1])**2 + (py[0]-py[-1])**2))
+    return path_len > 1e-12 and ep_dist < threshold * path_len
 
 
-def _smooth_path(
-    px: np.ndarray,
-    py: np.ndarray,
-    n_pts: int = _CONTOUR_PTS,
-    smooth_level: float = 3.0,
-) -> tuple:
+def _smooth_path(px, py, n_pts=_CONTOUR_PTS, smooth_level=5.0):
     """
-    Smooth a 2-D contour path via splprep.
-
-    Key: coordinates are NORMALISED to [0,1] before fitting so the smoothing
-    parameter s has coordinate-scale-independent meaning.  This ensures the
-    0-10 slider produces visually distinct results at every position:
-
-      smooth_level 0  → s = 0   (exact through all vertices)
-      smooth_level 1  → s ≈ 1e-4 (barely perceptible)
-      smooth_level 5  → s ≈ 0.007 (~2–3% avg deviation vs path width)
-      smooth_level 10 → s ≈ 0.5   (~7–10% avg deviation, strongly smoothed)
-
-    Mapping: s_norm = 10 ^ (-4 + smooth_level/10 × 3.699)
-
-    Closed paths (BEP ring): per=True → seamless circular closure.
-    Open paths: per=False → endpoints preserved, no artificial closure.
+    2-D parametric cubic spline for contour paths.
+    - Closed rings: per=True (seamless BEP ellipse).
+    - Open paths:  per=False (ends preserved exactly).
+    - Smoothing s uses same auto-scale formula as _smooth_series.
     """
     if len(px) < 4:
         return px, py
-    # Remove consecutive duplicates
     dup = np.concatenate(([True], np.diff(px)**2 + np.diff(py)**2 > 1e-20))
     px, py = px[dup], py[dup]
     if len(px) < 4:
         return px, py
 
     closed = _is_closed_path(px, py)
-
-    # Normalise to [0,1] so s is scale-independent
-    x_min, x_max = px.min(), px.max()
-    y_min, y_max = py.min(), py.max()
-    x_rng = max(x_max - x_min, 1e-10)
-    y_rng = max(y_max - y_min, 1e-10)
-    pxn = (px - x_min) / x_rng
-    pyn = (py - y_min) / y_rng
+    n = len(px)
+    auto_s = (max(float(n)*float(np.var(px)), 1e-12) +
+              max(float(n)*float(np.var(py)), 1e-12)) / 2.0
 
     if smooth_level <= 0.0:
         s = 0.0
     else:
-        # Log-scale mapping in normalised space:
-        # level 1 → s≈1e-4,  level 5 → s≈0.007,  level 10 → s≈0.5
-        s = 10 ** (-4.0 + smooth_level / 10.0 * np.log10(0.5 / 1e-4))
+        multiplier = 0.05 * (10 ** (smooth_level / 10 * np.log10(100)))
+        s = auto_s * multiplier
 
     try:
-        k = min(3, len(pxn) - 1)
-        tck, _ = splprep([pxn, pyn], s=s, k=k, per=closed)
+        k = min(3, n - 1)
+        tck, _ = splprep([px, py], s=s, k=k, per=closed)
         u_fine = np.linspace(0., 1., n_pts)
-        xsn, ysn = splev(u_fine, tck)
-        # Denormalise
-        return np.array(xsn) * x_rng + x_min, np.array(ysn) * y_rng + y_min
+        xs, ys = splev(u_fine, tck)
+        return np.array(xs), np.array(ys)
     except Exception:
         return px, py
 
 
-def _mask_below_min_speed(
-    EI_pct: np.ndarray,
-    xi: np.ndarray,
-    yi: np.ndarray,
-    df: pd.DataFrame,
-    x_col: str,
-    y_col: str,
-) -> np.ndarray:
+def _mask_below_min_speed(EI_pct, xi, yi, df, x_col, y_col):
+    """Set grid cells below lowest-RPM curve to NaN."""
     if "speed_rpm" not in df.columns:
         return EI_pct
     min_speed = df["speed_rpm"].min()
     min_df = df[df["speed_rpm"] == min_speed].sort_values(x_col)
-    xs_min = min_df[x_col].dropna().values
-    ys_min = min_df[y_col].dropna().values
-    if len(xs_min) < 2:
+    xs_m = min_df[x_col].dropna().values
+    ys_m = min_df[y_col].dropna().values
+    if len(xs_m) < 2:
         return EI_pct
     try:
-        min_p_func = interp1d(xs_min, ys_min, bounds_error=False,
-                              fill_value=(np.nan, np.nan))
+        fn = interp1d(xs_m, ys_m, bounds_error=False, fill_value=(np.nan, np.nan))
         result = EI_pct.copy()
-        for j, xi_val in enumerate(xi):
-            min_p = float(min_p_func(xi_val))
-            if np.isnan(min_p):
-                continue
-            for i, yi_val in enumerate(yi):
-                if yi_val < min_p:
-                    result[i, j] = np.nan
+        for j, xv in enumerate(xi):
+            mp = float(fn(xv))
+            if not np.isnan(mp):
+                result[:, j] = np.where(yi < mp, np.nan, result[:, j])
         return result
     except Exception:
         return EI_pct
@@ -143,96 +103,85 @@ def _mask_below_min_speed(
 
 def _extract_contour_paths(xi, yi, grid_pct, levels_pct):
     import numpy.ma as ma
-    grid_masked = ma.masked_invalid(grid_pct)
-    fig_mpl, ax_mpl = plt.subplots()
-    cs = ax_mpl.contour(xi, yi, grid_masked, levels=levels_pct)
-    segments = []
-    for level_val, segs in zip(cs.levels, cs.allsegs):
-        for seg in segs:
-            if len(seg) >= 4:
-                segments.append((float(level_val), seg[:, 0], seg[:, 1]))
-    plt.close(fig_mpl)
-    return segments
+    gm = ma.masked_invalid(grid_pct)
+    fig_m, ax_m = plt.subplots()
+    cs = ax_m.contour(xi, yi, gm, levels=levels_pct)
+    segs = []
+    for lv, sg in zip(cs.levels, cs.allsegs):
+        for s in sg:
+            if len(s) >= 4:
+                segs.append((float(lv), s[:, 0], s[:, 1]))
+    plt.close(fig_m)
+    return segs
 
 
-def _level_color(level_pct: float, lo: float, hi: float) -> str:
+def _level_color(level_pct, lo, hi):
     t = min(1.0, max(0.0, (level_pct - lo) / (hi - lo))) if hi > lo else 1.0
-    r = int(80  + (180 - 80)  * (1 - t))
-    g = int(140 + (60  - 140) * (1 - t))
+    r = int(80  + (180 - 80) * (1 - t))
+    g = int(140 + (60 - 140) * (1 - t))
     b = int(80  * (1 - t))
     return f"rgb({min(255,r)},{min(255,g)},{min(255,b)})"
 
 
-def _add_efficiency_contours(
-    fig: go.Figure,
-    df: pd.DataFrame,
-    x_col: str,
-    y_col: str,
-    eff_col: str = "efficiency",
-    contour_step_pct: float = 2.0,
-    smooth_level: float = 3.0,
-    grid_n: int = 400,
-) -> go.Figure:
+def _add_efficiency_contours(fig, df, x_col, y_col,
+                              eff_col="efficiency",
+                              contour_step_pct=2.0,
+                              smooth_level=5.0,
+                              grid_n=400):
     if eff_col not in df.columns or df[eff_col].isna().all():
         return fig
 
-    x_data   = df[x_col].to_numpy(dtype=float)
-    y_data   = df[y_col].to_numpy(dtype=float)
-    eff_data = df[eff_col].to_numpy(dtype=float)
+    xd = df[x_col].to_numpy(float)
+    yd = df[y_col].to_numpy(float)
+    ed = df[eff_col].to_numpy(float)
 
-    valid = np.isfinite(eff_data) & (eff_data > 1e-6)
+    valid = np.isfinite(ed) & (ed > 1e-6)
     if valid.sum() < 4:
         return fig
-    x_data, y_data, eff_data = x_data[valid], y_data[valid], eff_data[valid]
+    xd, yd, ed = xd[valid], yd[valid], ed[valid]
 
-    bep_idx     = int(np.nanargmax(eff_data))
-    bep_x       = float(x_data[bep_idx])
-    bep_y       = float(y_data[bep_idx])
-    bep_eta_pct = float(eff_data[bep_idx]) * 100.0
+    bep_i   = int(np.nanargmax(ed))
+    bep_x   = float(xd[bep_i])
+    bep_y   = float(yd[bep_i])
+    bep_pct = float(ed[bep_i]) * 100.0
 
-    xi = np.linspace(x_data.min(), x_data.max(), grid_n)
-    yi = np.linspace(y_data.min(), y_data.max(), grid_n)
+    xi = np.linspace(xd.min(), xd.max(), grid_n)
+    yi = np.linspace(yd.min(), yd.max(), grid_n)
     XI, YI = np.meshgrid(xi, yi)
-    EI_pct = griddata((x_data, y_data), eff_data * 100.0, (XI, YI),
-                       method="linear")
-    EI_pct = _mask_below_min_speed(EI_pct, xi, yi, df, x_col, y_col)
+    EI = griddata((xd, yd), ed * 100.0, (XI, YI), method="linear")
+    EI = _mask_below_min_speed(EI, xi, yi, df, x_col, y_col)
 
-    step      = contour_step_pct
-    bep_floor = float(np.floor(bep_eta_pct / step) * step)
-    lo_level  = max(step, bep_floor - 10 * step)
-    levels    = list(np.arange(lo_level, bep_floor + 0.001, step))
+    step  = contour_step_pct
+    floor = float(np.floor(bep_pct / step) * step)
+    lo    = max(step, floor - 10 * step)
+    levels = list(np.arange(lo, floor + 0.001, step))
     if not levels:
         return fig
 
-    segments = _extract_contour_paths(xi, yi, EI_pct, levels)
+    segments     = _extract_contour_paths(xi, yi, EI, levels)
+    shown_levels = set()
 
-    lo_pct, hi_pct = levels[0], levels[-1]
-    shown_levels   = set()
-
-    for level_pct, px, py in segments:
-        px_s, py_s = _smooth_path(np.array(px), np.array(py),
-                                   smooth_level=smooth_level)
-        color          = _level_color(level_pct, lo_pct, hi_pct)
-        show_in_legend = level_pct not in shown_levels
-        shown_levels.add(level_pct)
+    for lv_pct, px, py in segments:
+        px_s, py_s = _smooth_path(np.array(px), np.array(py), smooth_level=smooth_level)
+        color       = _level_color(lv_pct, levels[0], levels[-1])
+        first       = lv_pct not in shown_levels
+        shown_levels.add(lv_pct)
         mid = len(px_s) // 2
-        customdata = np.full(len(px_s), level_pct)
-
         fig.add_trace(
             go.Scatter(
                 x=px_s, y=py_s,
-                mode='lines+text' if (show_in_legend and len(px_s) > 20) else 'lines',
+                mode='lines+text' if (first and len(px_s) > 20) else 'lines',
                 line=dict(color=color, width=1.8),
-                text=([""] * mid + [f"{level_pct:.0f}%"] + [""] * (len(px_s) - mid - 1)
-                      if (show_in_legend and len(px_s) > 20) else None),
+                text=([""] * mid + [f"{lv_pct:.0f}%"] + [""] * (len(px_s) - mid - 1)
+                      if (first and len(px_s) > 20) else None),
                 textposition="middle right",
                 textfont=dict(size=10, color=color),
-                customdata=customdata,
+                customdata=np.full(len(px_s), lv_pct),
                 hovertemplate="Eff: %{customdata:.0f}%<extra></extra>",
-                name=f"η={level_pct:.0f}%",
+                name=f"η={lv_pct:.0f}%",
                 legendgroup="iso_eff",
-                legendgrouptitle_text="等效率线" if not shown_levels - {level_pct} else None,
-                showlegend=show_in_legend,
+                legendgrouptitle_text="等效率线" if not shown_levels - {lv_pct} else None,
+                showlegend=first,
             ),
             secondary_y=False,
         )
@@ -243,10 +192,10 @@ def _add_efficiency_contours(
             mode="markers+text",
             marker=dict(symbol="star", size=18, color="gold",
                         line=dict(color="darkorange", width=1.5)),
-            text=[f"BEP {bep_eta_pct:.1f}%"],
+            text=[f"BEP {bep_pct:.1f}%"],
             textposition="top right",
             textfont=dict(size=11, color="darkorange"),
-            name=f"BEP ({bep_eta_pct:.1f}%)",
+            name=f"BEP ({bep_pct:.1f}%)",
         ),
         secondary_y=False,
     )
@@ -264,43 +213,46 @@ def create_performance_curve(
     x_label: str = "Flow Rate",
     y1_label: str = "Pressure Ratio",
     y2_label: str = "Shaft Power",
-    smooth_level: float = 3.0,
+    perf_smooth: float = 3.0,
+    eff_smooth: float = 5.0,
+    show_power: bool = True,
     show_efficiency: bool = False,
     eff_contour_step: float = 2.0,
 ) -> go.Figure:
+
     fig = make_subplots(specs=[[{"secondary_y": True}]])
 
     if "speed_rpm" in df.columns:
-        speeds = sorted(df["speed_rpm"].unique())
-        for speed in speeds:
-            speed_df = df[df["speed_rpm"] == speed].sort_values(by=x_col)
-            x_raw  = speed_df[x_col].to_numpy(dtype=float)
-            y1_raw = speed_df[y1_col].to_numpy(dtype=float)
-            y2_raw = speed_df[y2_col].to_numpy(dtype=float)
+        for speed in sorted(df["speed_rpm"].unique()):
+            sd = df[df["speed_rpm"] == speed].sort_values(by=x_col)
+            xr  = sd[x_col].to_numpy(float)
+            y1r = sd[y1_col].to_numpy(float)
 
-            x_s1, y1_s = _smooth_series(x_raw, y1_raw, smooth_level=smooth_level)
-            x_s2, y2_s = _smooth_series(x_raw, y2_raw, smooth_level=smooth_level)
-
+            xs1, y1s = _smooth_series(xr, y1r, smooth_level=perf_smooth)
             fig.add_trace(
-                go.Scatter(x=x_s1, y=y1_s, name=f'PR @ {int(speed)} RPM',
+                go.Scatter(x=xs1, y=y1s, name=f'PR @ {int(speed)} RPM',
                            mode='lines', line=dict(width=2.5),
                            legendgroup=str(speed)),
                 secondary_y=False)
             fig.add_trace(
-                go.Scatter(x=x_raw, y=y1_raw, mode='markers',
+                go.Scatter(x=xr, y=y1r, mode='markers',
                            marker=dict(size=5, opacity=0.4, symbol='circle'),
                            legendgroup=str(speed), showlegend=False, hoverinfo='skip'),
                 secondary_y=False)
-            fig.add_trace(
-                go.Scatter(x=x_s2, y=y2_s, name=f'Power @ {int(speed)} RPM',
-                           mode='lines', line=dict(dash='dash', width=2),
-                           legendgroup=str(speed)),
-                secondary_y=True)
-            fig.add_trace(
-                go.Scatter(x=x_raw, y=y2_raw, mode='markers',
-                           marker=dict(size=5, opacity=0.4, symbol='diamond'),
-                           legendgroup=str(speed), showlegend=False, hoverinfo='skip'),
-                secondary_y=True)
+
+            if show_power and y2_col in sd.columns:
+                y2r = sd[y2_col].to_numpy(float)
+                xs2, y2s = _smooth_series(xr, y2r, smooth_level=perf_smooth)
+                fig.add_trace(
+                    go.Scatter(x=xs2, y=y2s, name=f'Power @ {int(speed)} RPM',
+                               mode='lines', line=dict(dash='dash', width=2),
+                               legendgroup=str(speed)),
+                    secondary_y=True)
+                fig.add_trace(
+                    go.Scatter(x=xr, y=y2r, mode='markers',
+                               marker=dict(size=5, opacity=0.4, symbol='diamond'),
+                               legendgroup=str(speed), showlegend=False, hoverinfo='skip'),
+                    secondary_y=True)
 
     if (not surge_line_df.empty
             and x_col in surge_line_df.columns
@@ -317,12 +269,11 @@ def create_performance_curve(
             fig, df, x_col=x_col, y_col=y1_col,
             eff_col="efficiency",
             contour_step_pct=eff_contour_step,
-            smooth_level=smooth_level,
+            smooth_level=eff_smooth,
         )
 
     fig.update_layout(
-        title_text="Fan Performance Map",
-        title_font_size=18,
+        title_text="Fan Performance Map", title_font_size=18,
         plot_bgcolor="white", paper_bgcolor="white",
         hovermode="x unified",
         font=dict(family="Arial, sans-serif", size=13),
@@ -338,7 +289,11 @@ def create_performance_curve(
                      showgrid=True, gridcolor='rgba(200,200,200,0.5)',
                      showline=True, linecolor='black', linewidth=1.5,
                      ticks="outside", ticklen=6, mirror=False)
-    fig.update_yaxes(title_text=y2_label, secondary_y=True,
-                     showgrid=False, showline=True, linecolor='gray',
-                     ticks="outside", ticklen=6)
+    fig.update_yaxes(title_text=y2_label if show_power else "",
+                     secondary_y=True,
+                     showgrid=False,
+                     showline=show_power, linecolor='gray',
+                     ticks="outside" if show_power else "",
+                     ticklen=6,
+                     showticklabels=show_power)
     return fig
