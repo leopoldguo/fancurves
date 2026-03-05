@@ -2,10 +2,10 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from scipy.interpolate import UnivariateSpline, griddata
+from scipy.interpolate import UnivariateSpline, griddata, splprep, splev
 
 import matplotlib
-matplotlib.use('Agg')           # Non-interactive backend, no window needed
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 _SMOOTH_POINTS = 300
@@ -19,7 +19,6 @@ def _smooth_series(
     n_points: int = _SMOOTH_POINTS,
     smooth_level: float = 3.0,
 ) -> tuple:
-    """Fit a smooth spline. smooth_level 0–10 maps to scipy s parameter."""
     if len(x) < 4:
         return x, y
     order = np.argsort(x)
@@ -44,48 +43,49 @@ def _smooth_series(
 
 # ─── Iso-efficiency contour helpers ──────────────────────────────────────────
 
-def _smooth_path(px: np.ndarray, py: np.ndarray, n_pts: int = 400) -> tuple:
+def _smooth_path(px: np.ndarray, py: np.ndarray, n_pts: int = 500) -> tuple:
     """
-    Arc-length parameterised spline smoothing of a contour path.
-    Works independently on x and y as functions of arc-length t ∈ [0,1].
-    Produces a smooth, dense curve that closely follows the original path
-    without forcing it through every raw grid vertex.
+    Densify and smooth a 2D contour path using scipy.splprep with s=0.
+
+    splprep(s=0) computes a cubic B-spline that passes EXACTLY through
+    every original vertex (exact interpolation, not smoothing-spline).
+    It uses arc-length parameterisation internally.
+
+    This avoids:
+    - Endpoint deformation (splprep has no endpoint boundary bias)
+    - Closure artefacts (per=False → open curve)
+    - X/Y independent fitting instability
+
+    The path looks smooth because splprep adds curves BETWEEN the original
+    grid-cell vertices (cubic interpolation), not by deviating from them.
     """
-    if len(px) < 5:
+    if len(px) < 4:
         return px, py
-    # Cumulative arc length → normalised parameter t
-    ds = np.sqrt(np.diff(px)**2 + np.diff(py)**2)
-    t  = np.concatenate([[0.], np.cumsum(ds)])
-    if t[-1] < 1e-12:
+    # Remove consecutive duplicates
+    mask = np.concatenate(([True], np.diff(px) ** 2 + np.diff(py) ** 2 > 1e-20))
+    px, py = px[mask], py[mask]
+    if len(px) < 4:
         return px, py
-    t /= t[-1]
-
-    # Remove duplicate t values
-    _, ui = np.unique(t, return_index=True)
-    t, px, py = t[ui], px[ui], py[ui]
-    if len(t) < 5:
-        return px, py
-
-    # Smoothing factor: allow gentle deviation for visual smoothness
-    auto_sx = max(len(px) * np.var(px), 1e-12)
-    auto_sy = max(len(py) * np.var(py), 1e-12)
     try:
-        sx = UnivariateSpline(t, px, s=auto_sx * 0.3, k=3, ext=3)
-        sy = UnivariateSpline(t, py, s=auto_sy * 0.3, k=3, ext=3)
-        t_fine = np.linspace(0., 1., n_pts)
-        return sx(t_fine), sy(t_fine)
+        k = min(3, len(px) - 1)
+        tck, _ = splprep([px, py], s=0, k=k, per=False)
+        u_fine = np.linspace(0., 1., n_pts)
+        x_s, y_s = splev(u_fine, tck)
+        return x_s, y_s
     except Exception:
         return px, py
 
 
 def _extract_contour_paths(xi, yi, grid_pct, levels_pct):
     """
-    Use matplotlib (non-displayed) to find iso-efficiency contour paths.
-    Returns list of (level_value_pct, x_array, y_array) for every segment.
-    Paths end naturally at the data region edge — no forced closure.
+    Use matplotlib (Agg, non-displayed) to extract contour path segments.
+    Returns list of (level_value_pct, x_array, y_array).
+    Segments end naturally at the data convex-hull boundary.
     """
+    import numpy.ma as ma
+    grid_masked = ma.masked_invalid(grid_pct)   # mask NaN → no extrapolation
     fig_mpl, ax_mpl = plt.subplots()
-    cs = ax_mpl.contour(xi, yi, grid_pct, levels=levels_pct)
+    cs = ax_mpl.contour(xi, yi, grid_masked, levels=levels_pct)
     segments = []
     for level_val, segs in zip(cs.levels, cs.allsegs):
         for seg in segs:
@@ -96,17 +96,11 @@ def _extract_contour_paths(xi, yi, grid_pct, levels_pct):
 
 
 def _level_color(level_pct: float, lo: float, hi: float) -> str:
-    """Map a level to a green shade: lower → light, higher → dark."""
-    if hi <= lo:
-        t = 1.0
-    else:
-        t = min(1.0, max(0.0, (level_pct - lo) / (hi - lo)))
+    t = min(1.0, max(0.0, (level_pct - lo) / (hi - lo))) if hi > lo else 1.0
     r = int(80  + (180 - 80)  * (1 - t))
-    g = int(120 + (220 - 120) * (1 - t) * 0.4 + 100 * t * 0.5)
+    g = int(140 + (60  - 140) * (1 - t))    # light→dark green
     b = int(80  * (1 - t))
-    # Clamp
-    r, g, b = min(255, r), min(255, g), min(255, b)
-    return f"rgb({r},{g},{b})"
+    return f"rgb({min(255,r)},{min(255,g)},{min(255,b)})"
 
 
 def _add_efficiency_contours(
@@ -119,11 +113,11 @@ def _add_efficiency_contours(
     grid_n: int = 300,
 ) -> go.Figure:
     """
-    Overlay smooth, open iso-efficiency contours using matplotlib path
-    extraction + arc-length spline smoothing + Plotly Scatter traces.
-
-    Open-boundary guarantee: matplotlib's allsegs provides path segments
-    that stop at the data convex-hull edge.  They are NOT closed by Plotly.
+    Overlay smooth, open iso-efficiency curves using:
+    1. griddata (linear) → 2-D efficiency field (NaN outside convex hull)
+    2. matplotlib masked contour → path segments (open at data boundary)
+    3. splprep(s=0) → exact cubic spline through each segment (no deviation)
+    4. Plotly Scatter → rendered as smooth coloured lines
     """
     if eff_col not in df.columns or df[eff_col].isna().all():
         return fig
@@ -143,35 +137,32 @@ def _add_efficiency_contours(
     bep_y       = float(y_data[bep_idx])
     bep_eta_pct = float(eff_data[bep_idx]) * 100.0
 
-    # 2-D grid (efficiency in %) via linear griddata
+    # 2-D grid (% units)
     xi = np.linspace(x_data.min(), x_data.max(), grid_n)
     yi = np.linspace(y_data.min(), y_data.max(), grid_n)
     XI, YI = np.meshgrid(xi, yi)
     EI_pct = griddata((x_data, y_data), eff_data * 100.0, (XI, YI),
                        method="linear")   # NaN outside convex hull
 
-    # Contour levels: step below BEP, rounded to clean numbers
+    # Contour levels (% units)
     step = contour_step_pct
-    bep_floor = float(np.floor(bep_eta_pct / step) * step)
-    lo_level  = max(step, bep_floor - 10 * step)
-    levels = list(np.arange(lo_level, bep_floor + 0.001, step))
+    bep_floor  = float(np.floor(bep_eta_pct / step) * step)
+    lo_level   = max(step, bep_floor - 10 * step)
+    levels     = list(np.arange(lo_level, bep_floor + 0.001, step))
     if not levels:
         return fig
 
-    # Extract paths via matplotlib
     segments = _extract_contour_paths(xi, yi, EI_pct, levels)
 
-    # Plot each segment as a smooth Plotly Scatter trace
     lo_pct, hi_pct = levels[0], levels[-1]
-    shown_levels = set()
+    shown_levels   = set()
 
     for level_pct, px, py in segments:
-        px_s, py_s = _smooth_path(px, py)
+        px_s, py_s = _smooth_path(np.array(px), np.array(py))
         color = _level_color(level_pct, lo_pct, hi_pct)
         show_in_legend = level_pct not in shown_levels
         shown_levels.add(level_pct)
 
-        # Mid-point annotation text (show on first segment of each level)
         mid = len(px_s) // 2
         customdata = np.full(len(px_s), level_pct)
 

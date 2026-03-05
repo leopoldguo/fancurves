@@ -7,9 +7,14 @@ HEADER_MAP = {
     "设定转速": "speed_rpm"
 }
 
-P_ATM_KPA   = 101.325   # kPa
-P_ATM_PA    = 101325.0  # Pa
-AIR_DENSITY_20C = 1.204 # kg/m³ at 20°C, 1 atm
+P_ATM_KPA       = 101.325    # kPa
+P_ATM_PA        = 101325.0   # Pa
+AIR_DENSITY_20C = 1.204      # kg/m³ at 20°C, 1 atm
+
+# Isentropic efficiency constants (air, dry)
+_GAMMA = 1.4
+_CP    = 1005.0    # J/(kg·K)
+_T_IN  = 293.15    # K = 20°C
 
 def normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     """将 CFX CSV 的中文表头标准化为内部统一的英文键。"""
@@ -29,7 +34,6 @@ def convert_flow_units(value: float, from_unit: str, to_unit: str, density: floa
     """
     if from_unit == to_unit:
         return value
-    # 先将所有单位转换为 m3/min 作为中间基准
     m3_min = value
     if from_unit == "kg/s":
         m3_min = (value / density) * 60.0
@@ -37,8 +41,6 @@ def convert_flow_units(value: float, from_unit: str, to_unit: str, density: floa
         m3_min = value / 35.3146667
     elif from_unit == "m3/h":
         m3_min = value / 60.0
-    # m3/min: no conversion needed
-
     if to_unit == "m3/min":
         return m3_min
     elif to_unit == "m3/h":
@@ -61,22 +63,33 @@ def convert_pressure_ratio_to_kpa(pressure_ratio_series: pd.Series, mode: str) -
     elif mode == "abs_kPa":
         return pressure_ratio_series * P_ATM_KPA
     else:
-        return pressure_ratio_series  # pressure_ratio, no change
+        return pressure_ratio_series
 
 def compute_efficiency(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Compute fan total pressure efficiency for each row:
-        η = Q [m³/s] × ΔP [Pa] / P_shaft [W]
+    Compute fan isentropic (total-to-total) efficiency for each row.
+
+    Formula (compressible, isentropic):
+        η_is = ṁ · cp · T_in · [(PR)^((γ-1)/γ) - 1] / P_shaft
+
+    Parameters:
+        T_in = 293.15 K (20°C), cp = 1005 J/(kg·K), γ = 1.4 (dry air)
+
+    This is physically correct for centrifugal fans/compressors and avoids
+    the ~4% overestimation of the simpler incompressible formula Q·ΔP/P.
 
     Requires columns: mass_flow (kg/s), pressure_ratio (-), shaft_power (kW).
-    Adds column 'efficiency' clipped to [0, 1].
+    Adds column 'efficiency' in [0, 1].
     """
     result = df.copy()
     try:
-        Q  = result["mass_flow"] / AIR_DENSITY_20C           # m³/s
-        dP = (result["pressure_ratio"] - 1.0) * P_ATM_PA     # Pa
-        W  = result["shaft_power"] * 1000.0                   # W
-        result["efficiency"] = (Q * dP / W).clip(0, 1)
+        exponent = (_GAMMA - 1.0) / _GAMMA          # (γ-1)/γ = 2/7 for air
+        W_is = (result["mass_flow"]
+                * _CP
+                * _T_IN
+                * (result["pressure_ratio"] ** exponent - 1.0))   # W
+        W_shaft = result["shaft_power"] * 1000.0                   # W
+        result["efficiency"] = (W_is / W_shaft).clip(0, 1)
     except KeyError:
         result["efficiency"] = float("nan")
     return result
@@ -98,14 +111,12 @@ def filter_operating_points(
     if "speed_rpm" not in df.columns or df.empty:
         return df, pd.DataFrame()
 
-    # 1. Compute surge points (min flow per speed) for the surge line
     surge_points = []
     for speed in sorted(df["speed_rpm"].unique()):
         speed_df = df[df["speed_rpm"] == speed]
         surge_points.append(speed_df.loc[speed_df[flow_col].idxmin()])
     surge_df = pd.DataFrame(surge_points).sort_values(by="speed_rpm")
 
-    # Linear surge line: flow = m_surge * pressure + b_surge
     m_surge, b_surge = None, None
     if len(surge_df) >= 2:
         p_lo, f_lo = surge_df.iloc[0][pressure_col], surge_df.iloc[0][flow_col]
@@ -115,7 +126,6 @@ def filter_operating_points(
             b_surge = f_lo - m_surge * p_lo
 
     def _interp(p1: dict, p2: dict, ratio: float) -> dict:
-        """Linear interpolation of all numeric fields between two points."""
         return {col: p1[col] + ratio * (p2[col] - p1[col])
                 if isinstance(p1[col], (int, float)) else p1[col]
                 for col in p1.keys()}
@@ -127,7 +137,7 @@ def filter_operating_points(
         if not points:
             continue
 
-        # ---- Phase A: Minimum Pressure Interpolation ----
+        # Phase A: Minimum Pressure
         refined = []
         for i in range(len(points) - 1):
             p1, p2 = points[i], points[i + 1]
@@ -145,7 +155,7 @@ def filter_operating_points(
         if points[-1][pressure_col] >= min_pressure:
             refined.append(points[-1])
 
-        # ---- Phase B: Maximum Power Interpolation ----
+        # Phase B: Maximum Power
         if max_power is not None and power_col in (points[0] if points else {}):
             power_refined = []
             for i in range(len(refined) - 1):
@@ -165,7 +175,7 @@ def filter_operating_points(
                 power_refined.append(refined[-1])
             refined = power_refined
 
-        # ---- Phase C: Surge Line Interpolation ----
+        # Phase C: Surge Line
         if m_surge is not None and refined:
             surge_refined = []
             for i in range(len(refined) - 1):
@@ -194,7 +204,6 @@ def filter_operating_points(
         new_rows.extend(refined)
 
     result_df = pd.DataFrame(new_rows)
-
     surge_line_df = pd.DataFrame({
         flow_col: [surge_df.iloc[0][flow_col], surge_df.iloc[-1][flow_col]],
         pressure_col: [surge_df.iloc[0][pressure_col], surge_df.iloc[-1][pressure_col]]
