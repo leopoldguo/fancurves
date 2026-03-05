@@ -1,3 +1,4 @@
+import math
 import streamlit as st
 import pandas as pd
 from data_parser import normalize_dataframe, convert_flow_units, filter_operating_points, convert_pressure_ratio_to_kpa
@@ -10,7 +11,15 @@ st.title("交互式风机性能曲线数据看板")
 st.sidebar.header("控制面板")
 uploaded_file = st.sidebar.file_uploader("上传 CFX 结果 (CSV)", type=["csv"])
 
-flow_unit = st.sidebar.selectbox("流量单位", ["kg/s", "m3/min", "CFM"])
+# 空气密度常量（20°C, 1 atm）
+AIR_DENSITY_20C = 1.204  # kg/m³
+
+flow_unit = st.sidebar.selectbox(
+    "流量单位",
+    ["kg/s", "m3/h", "m3/min", "CFM"],
+    help="体积流量均以 20°C、1 标准大气压下的空气密度 1.204 kg/m³ 换算"
+)
+
 pressure_display = st.sidebar.selectbox(
     "压力单位",
     ["压比 (PR)", "差压 (ΔkPa)", "绝对出口压力 (kPa abs)"],
@@ -22,13 +31,12 @@ PRESSURE_MODE_MAP = {
     "差压 (ΔkPa)": "delta_kPa",
     "绝对出口压力 (kPa abs)": "abs_kPa"
 }
-pressure_mode = PRESSURE_MODE_MAP[pressure_display]
-
 PRESSURE_LABEL_MAP = {
     "pressure_ratio": "压比 [-]",
     "delta_kPa": "差压 ΔP [kPa]",
     "abs_kPa": "绝对出口压力 [kPa]"
 }
+pressure_mode = PRESSURE_MODE_MAP[pressure_display]
 y1_label = PRESSURE_LABEL_MAP[pressure_mode]
 
 # ─── 数据上传 ─────────────────────────────────────────────────────────────────
@@ -44,16 +52,14 @@ if uploaded_file:
 
     df = normalize_dataframe(raw_df)
 
-    # 校验必要字段
     if "mass_flow" not in df.columns:
         st.error("未能识别流量列，请确保 CSV 包含'进口流量'等关键词。")
         st.stop()
 
     df["display_flow"] = df["mass_flow"].apply(
-        lambda x: convert_flow_units(x, "kg/s", flow_unit)
+        lambda x: convert_flow_units(x, "kg/s", flow_unit, density=AIR_DENSITY_20C)
     )
 
-    # 压力列处理：始终以原始压比做过滤，显示时再换算
     pressure_raw_col = "pressure_ratio"
     power_col = "shaft_power"
 
@@ -61,33 +67,37 @@ if uploaded_file:
         st.error("未能识别压力列，请确保 CSV 包含'压比'等关键词。")
         st.stop()
 
-    # ─── 侧边栏阈值控件 ──────────────────────────────────────────────────────
+    # ─── 过滤阈值控件 ─────────────────────────────────────────────────────────
     st.sidebar.markdown("---")
     st.sidebar.subheader("数据过滤阈值")
 
-    min_pr_val  = float(df[pressure_raw_col].min())
-    max_pr_val  = float(df[pressure_raw_col].max())
+    min_pr_val = float(df[pressure_raw_col].min())
+    max_pr_val = float(df[pressure_raw_col].max())
     min_pr_threshold = st.sidebar.number_input(
-        "最低压比阈值（总是以压比为基准）",
+        "最低压比阈值",
         min_value=1.0, max_value=float(max_pr_val),
-        value=float(min_pr_val), step=0.01, format="%.4f"
+        value=float(min_pr_val), step=0.01, format="%.4f",
+        help="低于此压比的数据点（含喘振线以左）将被裁剪，曲线线段按线性插值延伸至截断位置"
     )
 
     max_power_threshold = None
     if power_col in df.columns:
         min_pwr = float(df[power_col].min())
         max_pwr = float(df[power_col].max())
+        # 最大功率上限取整后加一，方便用户微调到数据内任意值
+        power_input_max = math.ceil(max_pwr) + 1
         enable_power_filter = st.sidebar.checkbox("启用最大功率阈值", value=False)
         if enable_power_filter:
             max_power_threshold = st.sidebar.number_input(
                 "最大功率阈值 (kW)",
                 min_value=float(min_pwr),
-                max_value=float(max_pwr),
-                value=float(max_pwr),
-                step=0.1, format="%.2f"
+                max_value=float(power_input_max),
+                value=float(power_input_max),
+                step=0.1, format="%.2f",
+                help="超过此功率的数据点将被裁剪，曲线延伸至截断位置"
             )
 
-    # ─── 过滤 ────────────────────────────────────────────────────────────────
+    # ─── 过滤计算 ─────────────────────────────────────────────────────────────
     filtered_df, surge_line_df = filter_operating_points(
         df,
         flow_col="display_flow",
@@ -98,44 +108,45 @@ if uploaded_file:
     )
 
     if filtered_df.empty:
-        st.warning("所有数据均被过滤条件剔除。请放宽阈值设置。")
+        st.warning("所有数据均被过滤条件剔除，请放宽阈值设置。")
         st.stop()
 
-    # ─── 将压比转换为所选显示单位 ────────────────────────────────────────────
+    # ─── 压力单位换算（显示层，过滤始终用压比） ───────────────────────────────
     filtered_df = filtered_df.copy()
     filtered_df["display_pressure"] = convert_pressure_ratio_to_kpa(
         filtered_df[pressure_raw_col], pressure_mode
     )
-
-    # 同样换算喘振线的 Y 值
     if not surge_line_df.empty:
         surge_line_df = surge_line_df.copy()
         surge_line_df["display_pressure"] = convert_pressure_ratio_to_kpa(
             surge_line_df[pressure_raw_col], pressure_mode
         )
 
-    # ─── 曲线平滑控制 ────────────────────────────────────────────────────────
+    # ─── 曲线平滑度 ───────────────────────────────────────────────────────────
     st.sidebar.markdown("---")
     st.sidebar.subheader("曲线平滑度")
     smooth_level = st.sidebar.slider(
         "平滑强度",
         min_value=0.0, max_value=10.0, value=3.0, step=0.5,
-        help="0 = 精确过每一个计算点（折线感），10 = 高平滑（经典风机曲线风格）"
+        help=(
+            "0 = 精确过每一个 CFD 计算点（可能有锯齿）；"
+            "3 = 推荐，自然平滑；"
+            "10 = 最高平滑，接近手绘风机图谱效果"
+        )
     )
-    # Convert UI level to scipy smoothing_factor:
-    # Level 0 → s very small (near-interpolating), Level 10 → s large (very smooth)
-    # We use None to let scipy auto-choose, then multiply by level factor.
-    _smooth_base = None if smooth_level == 0 else smooth_level
 
-    # ─── X 轴范围滑块 ────────────────────────────────────────────────────────
+    # ─── X 轴范围 ────────────────────────────────────────────────────────────
     st.sidebar.markdown("---")
     min_flow = float(filtered_df["display_flow"].min())
     max_flow = float(filtered_df["display_flow"].max())
     flow_range = st.sidebar.slider(
-        "X轴（流量）显示范围", min_flow, max_flow, (min_flow, max_flow)
+        f"X轴流量显示范围 ({flow_unit})", min_flow, max_flow, (min_flow, max_flow)
     )
 
-    mask = (filtered_df["display_flow"] >= flow_range[0]) & (filtered_df["display_flow"] <= flow_range[1])
+    mask = (
+        (filtered_df["display_flow"] >= flow_range[0]) &
+        (filtered_df["display_flow"] <= flow_range[1])
+    )
     final_df = filtered_df.loc[mask]
 
     # ─── 绘图 ─────────────────────────────────────────────────────────────────
@@ -146,14 +157,14 @@ if uploaded_file:
     else:
         fig = create_performance_curve(
             final_df,
-            surge_line_df if not surge_line_df.empty else surge_line_df,
+            surge_line_df,
             x_col="display_flow",
             y1_col="display_pressure",
             y2_col=power_col,
             x_label=f"流量 ({flow_unit})",
             y1_label=y1_label,
             y2_label="轴功率 (kW)",
-            smoothing_factor=_smooth_base,
+            smooth_level=smooth_level,
         )
         st.plotly_chart(fig, use_container_width=True)
 

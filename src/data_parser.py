@@ -21,17 +21,26 @@ def normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
                 break
     return df_clean.rename(columns=rename_dict)
 
-def convert_flow_units(value: float, from_unit: str, to_unit: str, density: float = 1.225) -> float:
-    """在 kg/s, m3/min 和 CFM 之间转换流量单位。"""
+def convert_flow_units(value: float, from_unit: str, to_unit: str, density: float = 1.204) -> float:
+    """在 kg/s, m3/min, m3/h, CFM 之间转换流量单位。
+    密度默认使用 20°C、1标准大气压的空气密度 1.204 kg/m³。
+    """
     if from_unit == to_unit:
         return value
+    # 先将所有单位转换为 m3/min 作为中间基准
     m3_min = value
     if from_unit == "kg/s":
         m3_min = (value / density) * 60.0
     elif from_unit == "CFM":
         m3_min = value / 35.3146667
+    elif from_unit == "m3/h":
+        m3_min = value / 60.0
+    # m3/min: no conversion needed, m3_min = value already
+
     if to_unit == "m3/min":
         return m3_min
+    elif to_unit == "m3/h":
+        return m3_min * 60.0
     elif to_unit == "kg/s":
         return (m3_min / 60.0) * density
     elif to_unit == "CFM":
