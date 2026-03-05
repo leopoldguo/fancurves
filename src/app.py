@@ -158,8 +158,19 @@ if uploaded_file:
         df = compute_efficiency(df)
         eff_source = "CSV 等熵效率列（直接值）" if can_use_csv_eff else "等熵公式计算值"
 
+    # ─── 真空模式检测 ──────────────────────────────────────────────────────────────
+    has_real_p_in = "p_in_pa" in df.columns and df["p_in_pa"].notna().any()
+    is_vacuum     = has_real_p_in and (df["p_in_pa"].median() < 100000.0)
+    avg_p_in_kpa  = df["p_in_pa"].mean() / 1000.0 if has_real_p_in else 101.325
+
+    # 在真空+差压模式下，动态覆盖 Y 轴标签
+    if is_vacuum and pressure_mode == "delta_kPa":
+        y1_label = "进口表压 [kPa]（真空模式，负值）"
+
     # ─── 过滤阈值 ─────────────────────────────────────────────────────────────
     if page_mode == "性能曲线看板":
+        if is_vacuum:
+            st.info(f"🌌 **真空模式已激活**：检测到 CSV 入口压力中位数为 **{avg_p_in_kpa:.1f} kPa**，低于 1 atm。Y 轴「差压」已自动切换为进口表压（负 kPa）。")
         st.sidebar.markdown("---")
         st.sidebar.subheader("数据过滤阈值")
         min_pr_val = float(df[pressure_raw_col].min())
@@ -201,23 +212,27 @@ if uploaded_file:
         # 压力单位换算（显示层）——基于每行入口绝对压力
         filtered_df = filtered_df.copy()
         
-        def row_pressure_display(row, mode):
+        def row_pressure_display(row, mode, vacuum_mode=False):
             pr = row[pressure_raw_col]
-            p_in = row.get("p_in_pa", 101325.0)  # 安全读取，缺列时回退至标准大气压
+            p_in = row.get("p_in_pa", 101325.0)
             if mode == "delta_kPa":
-                return (pr - 1.0) * (p_in / 1000.0)
+                if vacuum_mode:
+                    # 真空模式：显示进口表压（负小数 = 真空度）
+                    return (p_in - 101325.0) / 1000.0  # Pa → kPa ，得到负小数
+                else:
+                    return (pr - 1.0) * (p_in / 1000.0)
             elif mode == "abs_kPa":
                 return pr * (p_in / 1000.0)
             else:
                 return pr
 
         filtered_df["display_pressure"] = filtered_df.apply(
-            lambda row: row_pressure_display(row, pressure_mode), axis=1
+            lambda row: row_pressure_display(row, pressure_mode, is_vacuum), axis=1
         )
         if not surge_line_df.empty:
             surge_line_df = surge_line_df.copy()
             surge_line_df["display_pressure"] = surge_line_df.apply(
-                lambda row: row_pressure_display(row, pressure_mode), axis=1
+                lambda row: row_pressure_display(row, pressure_mode, is_vacuum), axis=1
             )
 
         # ─── 显示选项 ─────────────────────────────────────────────────────────────
