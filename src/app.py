@@ -394,10 +394,8 @@ if uploaded_file:
         else:
             def row_calc(row):
                 rpm = row['speed_rpm']
-                # Data Parser 导入进来的 pressure_ratio 目前代表压比或者压力(kPa)，这里我们需要明确获取压强差(kPa)。
-                # 为确保单位为 Pa，且是 gauge 压强，需要明确用户的输入来源。
-                # 假设 df["display_pressure"] 是显示压强，若是 kPa 则 *1000：
-                p_out_gauge_pa = row["display_pressure"] * 1000.0 if "kPa" in y1_label else row['pressure_ratio'] * 101325.0
+                # 重新计算该行的独立参数，以避免依赖性能看板才生成的 display_pressure
+                p_out_gauge_pa = (row[pressure_raw_col] - 1.0) * 101325.0
                 p_in_gauge_pa = 0.0 # 假定入口处为常压（0 Gauge）
                 
                 f_bp = calculate_backplate_force(
