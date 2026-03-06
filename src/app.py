@@ -72,25 +72,31 @@ section[data-testid="stSidebar"] details {
     padding: 4px 8px !important;
 }
 
-/* ── File Uploader (Glassmorphism) ── */
+/* ── File Uploader ── */
 [data-testid="stFileUploader"] {
-    background: rgba(59,95,160,0.15) !important;
-    border: 1.5px dashed rgba(94,140,220,0.60) !important;
+    background: transparent !important;
+}
+[data-testid="stFileUploaderDropzone"] {
+    background: rgba(59,95,160,0.25) !important;
+    border: 1.5px dashed rgba(126,170,238,0.70) !important;
     border-radius: 8px !important;
-    padding: 8px 12px !important;
     backdrop-filter: blur(4px) !important;
 }
-[data-testid="stFileUploader"] * {
-    color: var(--white-dim) !important;
+[data-testid="stFileUploaderDropzone"] * {
+    color: var(--white) !important;
+    background: transparent !important;
 }
-[data-testid="stFileUploader"] button {
+[data-testid="stFileUploaderDropzone"] button {
     background: var(--blue-brand) !important;
-    border: none !important;
+    border: 1px solid rgba(255,255,255,0.3) !important;
     color: white !important;
     border-radius: 4px !important;
 }
-[data-testid="stFileUploader"] button:hover {
+[data-testid="stFileUploaderDropzone"] button:hover {
     background: var(--blue-light) !important;
+}
+[data-testid="stFileUploaderDropzone"] svg {
+    fill: rgba(255,255,255,0.6) !important;
 }
 
 /* ── Headings ── */
