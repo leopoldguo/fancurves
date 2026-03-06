@@ -103,4 +103,4 @@ footer {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
-components.html(load_html("balance.html"), height=950, scrolling=True)
+st.components.v1.html(load_html("balance.html"), height=950, scrolling=True)

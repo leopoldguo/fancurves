@@ -90,4 +90,4 @@ footer {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
-components.html(load_html("gas-calculator.html"), height=1050, scrolling=True)
+st.components.v1.html(load_html("gas-calculator.html"), height=1050, scrolling=True)
