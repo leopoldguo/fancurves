@@ -12,6 +12,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# 使用刚刚抠图去底处理好的透明 Logo
+st.logo("assets/logo_transparent.png")
+
 pg = st.navigation([
     st.Page("pages/home.py",         title="工具箱首页",   icon="🏠", default=True),
     st.Page("pages/1_风机性能曲线.py", title="风机性能曲线", icon="📈"),
