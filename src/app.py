@@ -207,7 +207,7 @@ for _p in _header_logo_paths:
 if _header_logo_b64:
     _logo_tag = (
         f'<img src="data:image/{_header_mime};base64,{_header_logo_b64}" '
-        f'style="height:72px;width:72px;object-fit:contain;border-radius:8px;margin-right:16px;">'
+        f'style="height:42px;width:42px;object-fit:contain;margin-right:12px;">'
     )
 else:
     _logo_tag = ""
