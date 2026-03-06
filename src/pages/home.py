@@ -27,7 +27,7 @@ with col2:
         """
         <div style='text-align: center;'>
             <h1 style='font-size: 3rem; font-weight: 800; background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;'>
-                IBI 工程师工具箱
+                <span style='font-size: 1.25em; padding-right: 5px;'>IBI</span> 工程师工具箱
             </h1>
             <p style='color: #94a3b8; font-size: 1.2rem; margin-top: 10px; margin-bottom: 10px;'>
                 集成通用流体计算与力学分析，为内部工程师提供高效、精准的在线支持平台。
