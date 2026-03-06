@@ -334,10 +334,9 @@ def create_performance_curve(
 
     # 标题和副标题对调：使用 Plotly 支持的 HTML 标签保证两者完美居中对齐
     if _display_title:
-        main_title_text = f"<b>{_display_title}</b><br><span style='font-size:15px;color:#A0B4D0;'>风机性能曲线图</span>"
+        main_title_text = f"<b>{_display_title}</b><br><span style='font-size:15px;color:#A0B4D0;'>性能曲线图</span>"
     else:
-
-        main_title_text = "<b>风机性能曲线图</b>"
+        main_title_text = "<b>性能曲线图</b>"
     
     # 移除之前的 annotation，完全用 title 接管
     annotations = []
@@ -346,7 +345,7 @@ def create_performance_curve(
         title=dict(text=main_title_text, x=0.5, y=0.96, xanchor="center", yanchor="top", font=dict(size=22, color="#F5F7FA")),
         plot_bgcolor="#131B2E", paper_bgcolor="#131B2E",
         hovermode="x unified",
-        font=dict(family="IBM Plex Sans, sans-serif", size=13, color="#E8EDF5"),
+        font=dict(family="Arial, 'Microsoft YaHei', sans-serif", size=13, color="#E8EDF5"),
         legend=dict(orientation="v", bordercolor="rgba(126,170,238,0.3)",
                     borderwidth=1, bgcolor="rgba(19,27,46,0.90)"),
         margin=dict(l=80, r=80, t=100, b=60),
@@ -377,7 +376,7 @@ def create_performance_curve_export(fig_dark: go.Figure) -> go.Figure:
     fig.update_layout(
         plot_bgcolor="#FFFFFF",
         paper_bgcolor="#FFFFFF",
-        font=dict(color="#000000"),
+        font=dict(family="Arial, 'Microsoft YaHei', sans-serif", color="#000000"),
         title_font_color="#000000",
         legend=dict(
             orientation="h",
