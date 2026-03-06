@@ -6,6 +6,7 @@ import streamlit as st
 # ============================================================
 
 import os
+import base64
 
 st.set_page_config(
     page_title="IBI 工程师工具箱",
@@ -14,32 +15,21 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 使用绝对路径定位刚刚抠图好的透明 Logo，避免部署云端时因执行目录变化引起的路径报错
+# 读取透明 Logo 并转换为 base64
 logo_path = os.path.join(os.path.dirname(__file__), "assets", "logo_transparent.png")
-st.logo(logo_path)
+with open(logo_path, "rb") as f:
+    logo_base64 = base64.b64encode(f.read()).decode()
 
-# 全局侧边栏对齐样式修复
-st.markdown("""
-<style>
-/* 修复侧边栏带有 logo 时的超大间隔和不对齐问题 */
-[data-testid="stSidebarNav"] {
-    /* 调整导航上下边距，使其与上方 Logo 保持舒适距离 */
-    padding-top: 1.5rem !important;
-}
-[data-testid="stLogo"] {
-    /* Logo 原始容器下移，与导航的左侧留白看齐 */
-    margin-top: 2rem !important;
-    margin-left: 1.5rem !important;
-    margin-bottom: 0rem !important;
-}
-[data-testid="stLogo"] img {
-    /* 把 Logo 放大！Streamlit 默认卡得非常死，我们强行放大它的最大高度范围 */
-    max-height: 55px !important;
-    height: auto !important;
-    width: auto !important;
-}
-</style>
-""", unsafe_allow_html=True)
+# 使用标准的 markdown 注入侧边栏顶部，绝对可控的排版布局，完美适配各种屏幕并不产生重叠
+st.sidebar.markdown(
+    f"""
+    <div style="margin-top: 15px; margin-bottom: 25px; margin-left: 10px;">
+        <img src="data:image/png;base64,{logo_base64}" style="width: 85%; height: auto;">
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
 
 pg = st.navigation([
     st.Page("pages/home.py",         title="工具箱首页",   icon="🏠", default=True),
