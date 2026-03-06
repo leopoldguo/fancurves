@@ -55,4 +55,16 @@ def load_html(filename: str) -> str:
             pass
     return html
 
+st.markdown("""
+<style>
+#MainMenu {visibility: hidden;}
+header {visibility: hidden;}
+footer {visibility: hidden;}
+.block-container {
+    padding-top: 1rem !important;
+    padding-bottom: 0rem !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 components.html(load_html("gas-calculator.html"), height=1050, scrolling=True)

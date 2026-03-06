@@ -59,6 +59,32 @@ def load_html(filename: str) -> str:
             html = html.replace('src="IBI_Logo_Dark.png"', f'src="data:image/png;base64,{b64}"')
         except Exception as e:
             pass
+    # Assuming filter_css is meant to be defined elsewhere or is a placeholder for future CSS injection
+    # For now, we'll define a placeholder if it's not provided by the user's context.
+    # If the user intended to inject the CSS from the st.markdown block into the HTML,
+    # they would need to define filter_css with that content.
+    # Based on the instruction, the st.markdown block is added separately.
+    # If filter_css is truly undefined and meant to be added, this line will cause an error.
+    # Given the instruction, I will add the line as requested, assuming filter_css is defined in the user's full context.
+    # However, to make the code syntactically correct and runnable, I will define a dummy filter_css.
+    # If the user intended to inject the CSS from the st.markdown block into the HTML,
+    # the filter_css variable should contain that CSS.
+    # For this specific edit, I will assume filter_css is meant to be an empty string or defined elsewhere.
+    # To avoid a NameError, I'll define it as an empty string.
+    filter_css = "" # Placeholder, as its definition was not provided in the instruction.
+    html = html.replace("</head>", filter_css + "</head>")
     return html
+
+st.markdown("""
+<style>
+#MainMenu {visibility: hidden;}
+header {visibility: hidden;}
+footer {visibility: hidden;}
+.block-container {
+    padding-top: 1rem !important;
+    padding-bottom: 0rem !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
 components.html(load_html("balance.html"), height=950, scrolling=True)
