@@ -1,263 +1,262 @@
 import streamlit as st
 import math
 
+# ── 工具函数 ──────────────────────────────────────────────────────────────────
+PRESSURE_UNITS = {
+    "kPa":   lambda v: v,
+    "MPa":   lambda v: v * 1000,
+    "bar":   lambda v: v * 100,
+    "psi":   lambda v: v * 6.89476,
+    "atm":   lambda v: v * 101.325,
+    "Pa":    lambda v: v / 1000,
+    "mmH₂O": lambda v: v * 0.00980665,
+    "inH₂O": lambda v: v * 0.2490889,
+}
+MASS_FLOW_TO_KGS = {
+    "kg/s": 1, "kg/min": 1/60, "kg/h": 1/3600, "g/s": 0.001, "lb/s": 0.453592
+}
+VOL_FLOW_TO_M3S = {
+    "m³/s": 1, "m³/min": 1/60, "m³/h": 1/3600,
+    "L/s": 0.001, "L/min": 0.001/60, "CFM": 0.000471947,
+}
+POWER_FROM_KW = {"kW": 1, "W": 1000, "MW": 0.001, "hp": 1/0.7457, "PS": 1/0.7355}
+DENSITY_FROM_KGM3 = {"kg/m³": 1, "g/L": 1, "g/cm³": 0.001, "lb/ft³": 1/16.0185}
 
+COMMON_GASES = {
+    "空气":          (28.964, 1.40),
+    "氮气 (N₂)":    (28.013, 1.40),
+    "氧气 (O₂)":    (31.999, 1.40),
+    "二氧化碳 (CO₂)":(44.010, 1.30),
+    "氢气 (H₂)":    (2.016,  1.41),
+    "氦气 (He)":    (4.003,  1.66),
+    "氩气 (Ar)":    (39.948, 1.67),
+    "甲烷 (CH₄)":   (16.043, 1.31),
+    "自定义":        (28.964, 1.40),
+}
 
-hide_streamlit_style = """
+def std_density(M, T_ref_K):
+    """标准状态密度 (kg/m³), 101.325 kPa"""
+    R = 8.314 / (M / 1000)
+    return (101.325 * 1000) / (R * T_ref_K)
+
+def actual_density(M, p_kPa, T_K):
+    R = 8.314 / (M / 1000)
+    return (p_kPa * 1000) / (R * T_K) if T_K > 0 else 0
+
+def fmt(v, n=4):
+    if v is None or math.isnan(v): return "—"
+    if abs(v) >= 1e6 or (abs(v) < 1e-3 and v != 0):
+        return f"{v:.4e}"
+    return f"{v:.{n}f}"
+
+# ── 页面 ─────────────────────────────────────────────────────────────────────
+st.markdown("""
 <style>
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
-.metric-box {
-    background-color: #1e293b;
-    border-radius: 10px;
-    padding: 15px;
-    border: 1px solid #334155;
-    margin-bottom: 20px;
-}
-.metric-box-title {
-    font-size: 11px;
-    font-weight: 800;
-    color: #475569;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    margin-bottom: 8px;
-}
-.metric-big-flex {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-.metric-big-value {
-    font-size: 28px;
-    font-weight: 800;
-    color: #f1f5f9;
-    font-family: 'Consolas', monospace;
-}
-.metric-big-unit {
-    color: #94a3b8;
-    font-size: 16px;
-    font-weight: bold;
-}
-.result-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 8px 0;
-    border-bottom: 1px solid #1e293b;
-}
-.result-row-label {
-    font-size: 13px;
-    font-weight: 600;
-    color: #8b9bb4;
-}
-.result-row-value {
-    font-size: 14px;
-    font-weight: 700;
-    color: #cbd5e1;
-    font-family: 'Consolas', monospace;
-}
+/* 收紧 selectbox 上方 label 的留白 */
+div[data-testid="stSelectbox"] > label { margin-bottom: 0px; }
 </style>
-"""
-st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
-st.title("💨 通用气体计算软件")
-st.markdown("<p style='color:#94a3b8; margin-top:-15px;'>多工质气体热力学参数 / 绝热压缩功率计算</p>", unsafe_allow_html=True)
+st.markdown("""
+<div style='text-align:center; padding:12px 0;'>
+    <h1 style='margin-bottom:4px;'>💨 通用气体计算软件</h1>
+    <p style='color:#94a3b8; font-size:14px; margin:0; font-weight:bold;'>多工质气体热力学参数 / 绝热压缩功率计算</p>
+</div>
+""", unsafe_allow_html=True)
 st.markdown("---")
 
-# 数据字典 (内置的常见气体物性)
-COMMON_GASES = {
-    "空气": {"name": "空气", "molarMass": 28.964, "gamma": 1.4},
-    "氮气 (N₂)": {"name": "氮气 (N₂)", "molarMass": 28.013, "gamma": 1.4},
-    "氧气 (O₂)": {"name": "氧气 (O₂)", "molarMass": 31.999, "gamma": 1.4},
-    "二氧化碳 (CO₂)": {"name": "二氧化碳 (CO₂)", "molarMass": 44.010, "gamma": 1.3},
-    "氢气 (H₂)": {"name": "氢气 (H₂)", "molarMass": 2.016, "gamma": 1.41},
-    "氦气 (He)": {"name": "氦气 (He)", "molarMass": 4.003, "gamma": 1.66},
-    "氩气 (Ar)": {"name": "氩气 (Ar)", "molarMass": 39.948, "gamma": 1.67},
-    "甲烷 (CH₄)": {"name": "甲烷 (CH₄)", "molarMass": 16.043, "gamma": 1.31},
-    "自定义": {"name": "自定义气", "molarMass": 28.964, "gamma": 1.4}
-}
+col_left, col_right = st.columns([11, 10], gap="large")
 
-col_left, col_right = st.columns([12, 10], gap="large")
-
+# ══════════════════════════════════════════════
+# 左侧：参数输入
+# ══════════════════════════════════════════════
 with col_left:
-    st.markdown("### 参数设置 Parameter Settings")
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("#### 气体设置")
     
-    # === Group: 气体属性 ===
-    st.markdown("**1. 气体设置 (Gas Settings)**")
-    c1, c2 = st.columns(2)
-    with c1:
-        gas_choice = st.selectbox("选择气体", list(COMMON_GASES.keys()))
-        ref_p_val = st.number_input("参考气压 (当地大气压)", value=101.325, step=0.001)
-        ref_p_unit = st.selectbox("参考气压单位", ["kPa", "MPa", "bar", "atm", "psi", "Pa", "mmH₂O", "inH₂O"])
-    with c2:
-        m_mass_default = COMMON_GASES[gas_choice]["molarMass"]
-        g_default = COMMON_GASES[gas_choice]["gamma"]
-        molar_mass = st.number_input("分子量 (g/mol)", value=float(m_mass_default), step=0.1)
-        gamma = st.number_input("绝热指数 γ", value=float(g_default), step=0.01)
-
-    # 简单基准转换全部统一到 kPa
-    def to_kPa(val, unit):
-        if unit == "kPa": return val
-        if unit == "MPa": return val * 1000
-        if unit == "bar": return val * 100
-        if unit == "psi": return val * 6.89476
-        if unit == "atm": return val * 101.325
-        if unit == "Pa":  return val / 1000
-        if unit == "mmH₂O": return val * 0.00980665
-        if unit == "inH₂O": return val * 0.2490889
-        return val
-
-    ref_kPa = to_kPa(ref_p_val, ref_p_unit)
-
-    st.markdown("<hr style='margin:10px 0; border-color:#334155;'>", unsafe_allow_html=True)
-
-    # === Group: 压力 ===
-    st.markdown("**2. 压力参数 (Pressure)**")
-    c3, c4 = st.columns(2)
-    with c3:
-        inlet_p = st.number_input("入口压力 (表压)", value=0.0, step=1.0)
-        inlet_p_unit = st.selectbox("入口压力单位", ["kPa", "MPa", "bar", "atm", "psi", "Pa", "mmH₂O", "inH₂O"])
-    with c4:
-        outlet_p = st.number_input("出口压力 (表压)", value=0.0, step=1.0)
-        outlet_p_unit = st.selectbox("出口压力单位", ["kPa", "MPa", "bar", "atm", "psi", "Pa", "mmH₂O", "inH₂O"])
+    ga, gb = st.columns(2)
+    with ga:
+        gas_name = st.selectbox("选择气体", list(COMMON_GASES.keys()), label_visibility="visible")
     
-    p1_abs_kPa = ref_kPa + to_kPa(inlet_p, inlet_p_unit)
-    p2_abs_kPa = ref_kPa + to_kPa(outlet_p, outlet_p_unit)
-    
-    st.markdown(f"<p style='font-size:12px; color:#64748b;'>入口绝压（P1）: {p1_abs_kPa:.2f} kPa &nbsp; | &nbsp; 出口绝压（P2）: {p2_abs_kPa:.2f} kPa</p>", unsafe_allow_html=True)
-    
-    st.markdown("<hr style='margin:10px 0; border-color:#334155;'>", unsafe_allow_html=True)
+    def_M, def_g = COMMON_GASES[gas_name]
+    with gb:
+        # 参考气压 (数值 + 单位并排)
+        rp1, rp2 = st.columns([3, 2])
+        with rp1:
+            ref_p_val = st.number_input("参考气压", value=101.325, step=0.001, format="%.3f")
+        with rp2:
+            ref_p_unit = st.selectbox("单位##ref", list(PRESSURE_UNITS.keys()), label_visibility="collapsed")
 
-    # === Group: 温度与流量 ===
-    st.markdown("**3. 温度和流量 (Temp & Flow)**")
-    c5, c6 = st.columns(2)
-    with c5:
-        inlet_t = st.number_input("入口温度", value=25.0, step=1.0)
-        t_unit = st.selectbox("温度单位", ["°C", "K", "°F"])
-        
-        # 统一转开尔文
-        T1_K = inlet_t
-        if t_unit == "°C": T1_K = inlet_t + 273.15
+    ma, mb = st.columns(2)
+    with ma:
+        molar_mass = st.number_input("分子量 (g/mol)", value=float(def_M), step=0.1, format="%.3f")
+    with mb:
+        gamma = st.number_input("绝热指数 γ", value=float(def_g), step=0.01, format="%.2f")
+
+    ref_kPa = PRESSURE_UNITS[ref_p_unit](ref_p_val)
+
+    st.markdown("#### 压力参数")
+    pa1, pa2 = st.columns(2)
+    with pa1:
+        i1, i2 = st.columns([3, 2])
+        with i1:
+            inlet_p = st.number_input("入口压力 (表压)", value=0.0, step=1.0, format="%.3f")
+        with i2:
+            inlet_p_unit = st.selectbox("单位##inlet", list(PRESSURE_UNITS.keys()), label_visibility="collapsed")
+    with pa2:
+        o1, o2 = st.columns([3, 2])
+        with o1:
+            outlet_p = st.number_input("出口压力 (表压)", value=0.0, step=1.0, format="%.3f")
+        with o2:
+            outlet_p_unit = st.selectbox("单位##outlet", list(PRESSURE_UNITS.keys()), label_visibility="collapsed")
+
+    p1_kPa = ref_kPa + PRESSURE_UNITS[inlet_p_unit](inlet_p)
+    p2_kPa = ref_kPa + PRESSURE_UNITS[outlet_p_unit](outlet_p)
+    st.caption(f"入口绝压 P₁ = {fmt(p1_kPa, 2)} kPa　|　出口绝压 P₂ = {fmt(p2_kPa, 2)} kPa")
+
+    st.markdown("#### 温度与流量")
+    ta, tb = st.columns(2)
+    with ta:
+        t1, t2 = st.columns([3, 2])
+        with t1:
+            inlet_t = st.number_input("入口温度", value=25.0, step=1.0, format="%.1f")
+        with t2:
+            t_unit = st.selectbox("单位##temp", ["°C", "K", "°F"], label_visibility="collapsed")
+
+        if t_unit == "°C":   T1_K = inlet_t + 273.15
         elif t_unit == "°F": T1_K = (inlet_t - 32) * 5/9 + 273.15
+        else:                T1_K = inlet_t
 
-        eff = st.number_input("绝热效率 (%)", value=80.0, step=1.0) / 100.0
+        eff_pct = st.number_input("绝热效率 (%)", value=80.0, min_value=1.0, max_value=100.0, step=1.0)
+        eff = eff_pct / 100.0
 
-    with c6:
-        flow_mode = st.radio("流量输入类型", ["质量流量", "体积流量"], horizontal=True)
+    with tb:
+        flow_mode = st.radio("流量类型", ["质量流量", "体积流量"], horizontal=True)
         if flow_mode == "质量流量":
-            m_flow_val = st.number_input("质量流量数值", value=1.0, step=0.1)
-            m_flow_unit = st.selectbox("质量单位", ["kg/s", "kg/min", "kg/h", "g/s", "lb/s"])
-            
-            # 统一转 kg/s
-            if m_flow_unit == "kg/s": m_flow_kgs = m_flow_val
-            elif m_flow_unit == "kg/min": m_flow_kgs = m_flow_val / 60
-            elif m_flow_unit == "kg/h": m_flow_kgs = m_flow_val / 3600
-            elif m_flow_unit == "g/s": m_flow_kgs = m_flow_val / 1000
-            elif m_flow_unit == "lb/s": m_flow_kgs = m_flow_val * 0.453592
-            
-            v_flow_base = "实际入口" # 不重要
+            f1, f2 = st.columns([3, 2])
+            with f1:
+                mf_val = st.number_input("流量值", value=1.0, step=0.1, format="%.4f")
+            with f2:
+                mf_unit = st.selectbox("单位##mf", list(MASS_FLOW_TO_KGS.keys()), label_visibility="collapsed")
+            m_kgs = mf_val * MASS_FLOW_TO_KGS[mf_unit]
         else:
-            v_flow_val = st.number_input("体积流量数值", value=1.0, step=0.1)
-            v_flow_unit = st.selectbox("体积单位", ["m³/s", "m³/min", "m³/h", "L/s", "L/min", "CFM"])
-            v_flow_base = st.selectbox("体积标态基准", ["实际入口", "标方 20°C", "标方 0°C"])
+            f1, f2 = st.columns([3, 2])
+            with f1:
+                vf_val = st.number_input("流量值", value=1.0, step=0.1, format="%.4f")
+            with f2:
+                vf_unit = st.selectbox("单位##vf", list(VOL_FLOW_TO_M3S.keys()), label_visibility="collapsed")
+            vf_base = st.selectbox("体积基准", ["实际入口", "标方 20°C", "标方 0°C"])
+            vf_m3s = vf_val * VOL_FLOW_TO_M3S[vf_unit]
+            M = molar_mass
+            if vf_base == "实际入口":
+                rho_f = actual_density(M, p1_kPa, T1_K)
+            elif vf_base == "标方 20°C":
+                rho_f = std_density(M, 293.15)
+            else:
+                rho_f = std_density(M, 273.15)
+            m_kgs = vf_m3s * rho_f
 
-            # 统一转 m3/s
-            if v_flow_unit == "m³/s": v_flow_m3s = v_flow_val
-            elif v_flow_unit == "m³/min": v_flow_m3s = v_flow_val / 60
-            elif v_flow_unit == "m³/h": v_flow_m3s = v_flow_val / 3600
-            elif v_flow_unit == "L/s": v_flow_m3s = v_flow_val / 1000
-            elif v_flow_unit == "L/min": v_flow_m3s = v_flow_val / 60000
-            elif v_flow_unit == "CFM": v_flow_m3s = v_flow_val * 0.000471947
-            
-            # 内部算密度推算 kg/s
-            R_gas = 8.314 / (molar_mass / 1000.0)
-            if v_flow_base == "实际入口":
-                rho_flow = (p1_abs_kPa * 1000) / (R_gas * T1_K)
-            elif v_flow_base == "标方 20°C":
-                rho_flow = (101.325 * 1000) / (R_gas * 293.15)
-            elif v_flow_base == "标方 0°C":
-                rho_flow = (101.325 * 1000) / (R_gas * 273.15)
-                
-            m_flow_kgs = v_flow_m3s * rho_flow
+# ══════════════════════════════════════════════
+# 核心计算
+# ══════════════════════════════════════════════
+M = molar_mass
+R_gas = 8.314 / (M / 1000)
 
+rho_std20  = std_density(M, 293.15)
+rho_std0   = std_density(M, 273.15)
+rho_act_in = actual_density(M, p1_kPa, T1_K)
 
+W_ad_kW = W_sh_kW = 0.0
+T2_K = T1_K
+
+if p1_kPa > 0 and p2_kPa > 0 and gamma > 1 and p2_kPa != p1_kPa:
+    pr  = p2_kPa / p1_kPa
+    exp = (gamma - 1) / gamma
+    W_ad_W    = (m_kgs * R_gas * T1_K / exp) * (pr**exp - 1)
+    W_ad_kW   = W_ad_W / 1000
+    W_sh_kW   = W_ad_kW / eff if eff > 0 else 0
+    T2s       = T1_K * pr**exp
+    T2_K      = T1_K + (T2s - T1_K) / eff
+
+rho_act_out  = actual_density(M, p2_kPa, T2_K)
+q_in_m3h     = (m_kgs / rho_act_in)  * 3600 if rho_act_in  > 0 else 0
+q_out_m3h    = (m_kgs / rho_act_out) * 3600 if rho_act_out > 0 else 0
+
+# 出口温度回算到用户单位
+if t_unit == "°C":   T2_disp = T2_K - 273.15
+elif t_unit == "°F": T2_disp = (T2_K - 273.15) * 9/5 + 32
+else:                T2_disp = T2_K
+
+# ══════════════════════════════════════════════
+# 右侧：计算结果
+# ══════════════════════════════════════════════
 with col_right:
-    st.markdown("### 计算结果 Calculation")
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    R_gas = 8.314 / (molar_mass / 1000)
-    density_act_in = (p1_abs_kPa * 1000) / (R_gas * T1_K) if T1_K > 0 else 0
-    density_std_20 = (101.325 * 1000) / (R_gas * 293.15)
-    density_std_0 = (101.325 * 1000) / (R_gas * 273.15)
+    st.markdown("#### 功率输出")
 
-    # 计算压比和功率
-    W_ad_kW = 0.0
-    W_sh_kW = 0.0
-    T2_K = T1_K
+    pw_unit_col, pw_unit_val = st.columns([3, 2])
+    with pw_unit_val:
+        pw_unit = st.selectbox("功率单位", list(POWER_FROM_KW.keys()), key="pw_unit")
     
-    if p1_abs_kPa > 0 and p2_abs_kPa > 0 and gamma > 1:
-        pr = p2_abs_kPa / p1_abs_kPa
-        exp_factor = (gamma - 1) / gamma
-        
-        # 绝热做功 W = (m * R * T1 / ( (gamma-1)/gamma ) ) * (pr^((gamma-1)/gamma) - 1)
-        W_ad_W = (m_flow_kgs * R_gas * T1_K / exp_factor) * (math.pow(pr, exp_factor) - 1)
-        W_ad_kW = W_ad_W / 1000.0
-        
-        if eff > 0:
-            W_sh_kW = W_ad_kW / eff
-            
-        T2s = T1_K * math.pow(pr, exp_factor)
-        T2_K = T1_K + (T2s - T1_K) / eff
+    w_ad_disp = W_ad_kW * POWER_FROM_KW[pw_unit]
+    w_sh_disp = W_sh_kW * POWER_FROM_KW[pw_unit]
 
-    density_act_out = (p2_abs_kPa * 1000) / (R_gas * T2_K) if T2_K > 0 else 0
-    act_v_flow_in_m3h = (m_flow_kgs / density_act_in) * 3600 if density_act_in > 0 else 0
-    act_v_flow_out_m3h = (m_flow_kgs / density_act_out) * 3600 if density_act_out > 0 else 0
-    
-    # ======= 输出渲染区 =======
-    
-    st.markdown("<div class='metric-box'>", unsafe_allow_html=True)
-    st.markdown("<div class='metric-box-title'>绝热功率 ADIABATIC POWER</div>", unsafe_allow_html=True)
     st.markdown(f"""
-    <div class='metric-big-flex'>
-        <span class='metric-big-value'>{W_ad_kW:.2f}</span>
-        <span class='metric-big-unit'>kW</span>
+    <div style='background:#1e293b; padding:14px 16px; border-radius:10px; border:1px solid #334155; margin-bottom:8px;'>
+        <div style='display:flex; justify-content:space-between; align-items:center;'>
+            <p style='color:#475569; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:2px; margin:0;'>绝热功率</p>
+            <span style='font-size:24px; font-weight:800; color:#f1f5f9; font-family:Consolas,monospace;'>{fmt(w_ad_disp)} {pw_unit}</span>
+        </div>
+        <div style='display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding-top:10px; border-top:1px solid #334155;'>
+            <p style='color:#475569; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:2px; margin:0;'>轴功率</p>
+            <span style='font-size:24px; font-weight:800; color:#60a5fa; font-family:Consolas,monospace;'>{fmt(w_sh_disp)} {pw_unit}</span>
+        </div>
     </div>
     """, unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown("<div class='metric-box'>", unsafe_allow_html=True)
-    st.markdown("<div class='metric-box-title'>轴功率 SHAFT POWER</div>", unsafe_allow_html=True)
+
+    st.markdown("#### 气体密度")
+    d1, d2 = st.columns([4, 2])
+    with d2:
+        d_unit = st.selectbox("密度单位", list(DENSITY_FROM_KGM3.keys()))
+    dv = DENSITY_FROM_KGM3[d_unit]
+
+    with d1:
+        st.markdown(f"""
+        <div style='background:#1e293b; padding:11px 14px; border-radius:10px; border:1px solid #334155;'>
+            <div style='display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid #334155;'>
+                <span style='color:#475569; font-size:11px; font-weight:700;'>标态 20°C</span>
+                <span style='color:#94a3b8; font-size:13px; font-weight:700; font-family:Consolas,monospace;'>{fmt(rho_std20*dv)} {d_unit}</span>
+            </div>
+            <div style='display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid #334155;'>
+                <span style='color:#475569; font-size:11px; font-weight:700;'>标态 0°C</span>
+                <span style='color:#94a3b8; font-size:13px; font-weight:700; font-family:Consolas,monospace;'>{fmt(rho_std0*dv)} {d_unit}</span>
+            </div>
+            <div style='display:flex; justify-content:space-between; padding:4px 0;'>
+                <span style='color:#475569; font-size:11px; font-weight:700;'>实际入口</span>
+                <span style='color:#94a3b8; font-size:13px; font-weight:700; font-family:Consolas,monospace;'>{fmt(rho_act_in*dv)} {d_unit}</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("#### 其他参数")
     st.markdown(f"""
-    <div class='metric-big-flex'>
-        <span class='metric-big-value' style='color:#60a5fa;'>{W_sh_kW:.2f}</span>
-        <span class='metric-big-unit' style='color:#3b82f6;'>kW</span>
+    <div style='background:#1e293b; padding:11px 14px; border-radius:10px; border:1px solid #334155;'>
+        <div style='display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #334155;'>
+            <span style='color:#475569; font-size:12px; font-weight:600;'>出口温度</span>
+            <span style='color:#cbd5e1; font-size:13px; font-weight:700; font-family:Consolas,monospace;'>{fmt(T2_disp, 2)} {t_unit}</span>
+        </div>
+        <div style='display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #334155;'>
+            <span style='color:#475569; font-size:12px; font-weight:600;'>折算质量流量</span>
+            <span style='color:#cbd5e1; font-size:13px; font-weight:700; font-family:Consolas,monospace;'>{fmt(m_kgs, 5)} kg/s</span>
+        </div>
+        <div style='display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #334155;'>
+            <span style='color:#475569; font-size:12px; font-weight:600;'>实际入口体积流量</span>
+            <span style='color:#cbd5e1; font-size:13px; font-weight:700; font-family:Consolas,monospace;'>{fmt(q_in_m3h, 2)} m³/h</span>
+        </div>
+        <div style='display:flex; justify-content:space-between; padding:5px 0;'>
+            <span style='color:#475569; font-size:12px; font-weight:600;'>实际出口体积流量</span>
+            <span style='color:#cbd5e1; font-size:13px; font-weight:700; font-family:Consolas,monospace;'>{fmt(q_out_m3h, 2)} m³/h</span>
+        </div>
     </div>
     """, unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    # 气体密度
-    st.markdown("<div class='metric-box'>", unsafe_allow_html=True)
-    st.markdown("<div class='metric-box-title'>气体密度 GAS DENSITY (kg/m³)</div>", unsafe_allow_html=True)
-    st.markdown(f"""
-    <div class='result-row'><span class='result-row-label'>标态 20°C</span><span class='result-row-value'>{density_std_20:.4f}</span></div>
-    <div class='result-row'><span class='result-row-label'>标态 0°C</span><span class='result-row-value'>{density_std_0:.4f}</span></div>
-    <div class='result-row' style='border:none;'><span class='result-row-label'>实际入口工况</span><span class='result-row-value'>{density_act_in:.4f}</span></div>
-    """, unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
-    
-    # 出口温度和其他流量
-    st.markdown("<div class='metric-box'>", unsafe_allow_html=True)
-    st.markdown("<div class='metric-box-title'>其他状态参数 OTHER PARAMS</div>", unsafe_allow_html=True)
-    
-    # 按照输入单位回推出口温度显示
-    if t_unit == "°C": T2_disp = T2_K - 273.15
-    elif t_unit == "°F": T2_disp = (T2_K - 273.15) * 9/5 + 32
-    else: T2_disp = T2_K
-
-    st.markdown(f"""
-    <div class='result-row'><span class='result-row-label'>出口温度</span><span class='result-row-value'>{T2_disp:.2f} {t_unit}</span></div>
-    <div class='result-row'><span class='result-row-label'>折算系统质量流量</span><span class='result-row-value'>{m_flow_kgs:.4f} kg/s</span></div>
-    <div class='result-row'><span class='result-row-label'>实际入口容积流量</span><span class='result-row-value'>{act_v_flow_in_m3h:.2f} m³/h</span></div>
-    <div class='result-row' style='border:none;'><span class='result-row-label'>实际出口容积流量</span><span class='result-row-value'>{act_v_flow_out_m3h:.2f} m³/h</span></div>
-    """, unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
