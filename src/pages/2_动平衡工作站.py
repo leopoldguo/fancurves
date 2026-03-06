@@ -1,11 +1,7 @@
 import streamlit as st
 import math
 
-st.set_page_config(
-    page_title="动平衡去重工作站",
-    page_icon="⚖️",
-    layout="wide"
-)
+
 
 # 隐藏默认菜单
 hide_streamlit_style = """

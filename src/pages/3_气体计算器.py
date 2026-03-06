@@ -1,11 +1,7 @@
 import streamlit as st
 import math
 
-st.set_page_config(
-    page_title="通用气体计算软件",
-    page_icon="💨",
-    layout="wide"
-)
+
 
 hide_streamlit_style = """
 <style>

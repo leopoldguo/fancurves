@@ -11,7 +11,7 @@ from plotter import create_performance_curve, create_performance_curve_export
 import json
 import os
 
-st.set_page_config(page_title="Fan Performance Dashboard", layout="wide")
+
 
 st.markdown("""
 <style>
