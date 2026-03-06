@@ -324,6 +324,11 @@ def create_performance_curve(
             
         fig = _add_efficiency_contours(
             fig, eff_df, x_col=x_col, y_col=y1_col,
+            eff_col="efficiency",
+            contour_step_pct=eff_contour_step,
+            smooth_level=eff_smooth,
+        )
+
     # 去掉文件名的后缀（如 .csv）
     _display_title = chart_title.rsplit(".", 1)[0] if chart_title and "." in chart_title else chart_title
 
