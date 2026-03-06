@@ -13,46 +13,32 @@ import os
 
 st.set_page_config(page_title="Fan Performance Dashboard", layout="wide")
 
-if "app_mode" not in st.session_state:
-    st.session_state["app_mode"] = "Compressor"
-
-# 动态主题 CSS
-sidebar_bg = "#1E3A5F" if st.session_state["app_mode"] == "Compressor" else "#F0F2F6"
-sidebar_text = "#FFFFFF" if st.session_state["app_mode"] == "Compressor" else "#262730"
-accent_color = "#C0392B" # 统一使用 logo 里的深红色作为点缀
-
-st.markdown(f"""
+st.markdown("""
 <style>
-    /* 侧边栏动态配色 */
-    [data-testid="stSidebar"] {{
-        background-color: {sidebar_bg} !important;
-        color: {sidebar_text} !important;
-    }}
-    [data-testid="stSidebar"] .stMarkdown, [data-testid="stSidebar"] label {{
-        color: {sidebar_text} !important;
-    }}
-    
-    /* 工业感 Mono 字体 */
-    .stMetricValue, .stNumberInput input, .stSlider div[role="slider"] {{
+    /* Industrial Theme CSS Injection */
+    .stMetricValue, .stNumberInput input, .stSlider div[role="slider"] {
         font-family: 'Roboto Mono', 'Courier New', monospace !important;
-    }}
-    
-    /* 品牌色点缀 (红包/深红) */
-    div[data-baseweb="slider"] div {{
-        background-color: {accent_color} !important;
-    }}
-    .stButton>button {{
-        border-color: {accent_color} !important;
-        color: {accent_color} !important;
-    }}
-    
-    h1, h2, h3 {{
+    }
+    /* Safety Orange for Sliders and Accents */
+    .stSlider div[data-baseweb="slider"] div {
+        background-color: #FF8C00 !important;
+    }
+    h1, h2, h3 {
         color: #E0E0E0 !important;
-    }}
+    }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("风机性能曲线数据看板")
+# ─── 头部标题与 Logo (居中显示) ──────────────────────────────────────────────────
+col_logo1, col_logo2, col_logo3 = st.columns([1, 0.8, 1])
+with col_logo2:
+    logo_path = os.path.join(os.path.dirname(__file__), "..", "IBI Logo.jpeg")
+    if os.path.exists(logo_path):
+        st.image(logo_path, use_container_width=True)
+    else:
+        # 兼容性回退
+        st.image("IBI Logo.jpeg", use_container_width=True)
+st.markdown("<h1 style='text-align: center; margin-top: -20px;'>风机性能曲线数据看板</h1>", unsafe_allow_html=True)
 
 PREFS_FILE = "user_prefs.json"
 
@@ -117,20 +103,6 @@ def calc_specific_speed(rpm, flow_val, flow_unit, pr):
     return rpm * math.sqrt(q) / (h_ad_m**0.75)
 
 # ─── 侧边栏 ───────────────────────────────────────────────────────────────────
-# Logo 展示
-logo_path = "src/assets/logo_compressor.png" if st.session_state["app_mode"] == "Compressor" else "src/assets/logo_vacuum.png"
-if os.path.exists(logo_path):
-    st.sidebar.image(logo_path, use_container_width=True)
-else:
-    st.sidebar.markdown(f"### ibi {st.session_state['app_mode']}")
-
-st.sidebar.markdown("---")
-st.sidebar.subheader("系统模式")
-app_mode = st.sidebar.selectbox(
-    "当前运行模式", ["Compressor", "Vacuum Pump"],
-    key="app_mode", on_change=save_pref, args=("app_mode",)
-)
-
 st.sidebar.header("控制面板")
 
 page_mode = st.sidebar.radio(
@@ -197,15 +169,8 @@ if uploaded_file:
 
     # ─── 真空模式检测 ──────────────────────────────────────────────────────────────
     has_real_p_in = "p_in_pa" in df.columns and df["p_in_pa"].notna().any()
-    is_vacuum_detected = has_real_p_in and (df["p_in_pa"].median() < 100000.0)
+    is_vacuum     = has_real_p_in and (df["p_in_pa"].median() < 100000.0)
     avg_p_in_kpa  = df["p_in_pa"].mean() / 1000.0 if has_real_p_in else 101.325
-
-    # 自动对齐模式（如果检测到真空且用户未手动强制 Compressor）
-    if is_vacuum_detected and st.session_state["app_mode"] == "Compressor":
-        st.session_state["app_mode"] = "Vacuum Pump"
-        st.rerun()
-
-    is_vacuum = (st.session_state["app_mode"] == "Vacuum Pump")
 
     # 在真空+差压模式下，动态覆盖 Y 轴标签
     if is_vacuum and pressure_mode == "delta_kPa":
