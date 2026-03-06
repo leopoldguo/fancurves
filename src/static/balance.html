@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>动平衡工作站</title>
+    <!-- 引入 Tailwind CSS 进行快速美化 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 自定义一些工业风的配色 */
+        :root {
+            --primary: #2563eb;
+            --surface: #ffffff;
+            --background: #f1f5f9;
+        }
+
+        body {
+            background-color: var(--background);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        /* 隐藏数字输入框的上下箭头 */
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+    </style>
+
+    <style>
+        /* [Dark Theme Global Override Strategy] */
+        body {
+            background-color: #1e2535 !important;
+            color: #e2e8f0 !important;
+        }
+
+        .bg-white {
+            background-color: #252f44 !important;
+            border-color: #3a4760 !important;
+        }
+
+        .bg-slate-50 {
+            background-color: #1e2535 !important;
+        }
+
+        .bg-slate-100 {
+            background-color: #2b3a55 !important;
+        }
+
+        .text-slate-800,
+        .text-slate-900 {
+            color: #f8fafc !important;
+        }
+
+        .text-slate-700 {
+            color: #e2e8f0 !important;
+        }
+
+        .text-slate-600 {
+            color: #cbd5e1 !important;
+        }
+
+        .text-slate-500 {
+            color: #94a3b8 !important;
+        }
+
+        .text-slate-400 {
+            color: #8b9bb4 !important;
+        }
+
+        .border-slate-200,
+        .border-slate-300 {
+            border-color: #3a4760 !important;
+        }
+
+        /* Cards */
+        .shadow-sm,
+        .shadow-md,
+        .shadow-lg {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3) !important;
+        }
+
+        .text-blue-700 {
+            color: #60a5fa !important;
+        }
+
+        .bg-blue-100 {
+            background-color: rgba(37, 99, 235, 0.2) !important;
+            color: #93c5fd !important;
+            border-color: rgba(37, 99, 235, 0.4) !important;
+        }
+
+        .bg-blue-600 {
+            background-color: #3b82f6 !important;
+        }
+
+        .hover\:bg-blue-700:hover {
+            background-color: #2563eb !important;
+        }
+
+        .bg-emerald-500 {
+            background-color: #10b981 !important;
+        }
+
+        /* Forms */
+        input,
+        select {
+            background-color: #1e2535 !important;
+            color: #e2e8f0 !important;
+            border-color: #3a4760 !important;
+        }
+
+        input:focus,
+        select:focus {
+            border-color: #3b82f6 !important;
+        }
+
+        /* Invert logo for dark mode visibility */
+        img[alt="IBI Logo"] {}
+
+        /* Specific dark sections */
+        .bg-slate-800,
+        .bg-slate-900 {
+            background-color: #0f172a !important;
+        }
+    </style>
+
+</head>
+
+<body class="min-h-screen text-slate-800 p-4 md:p-8 flex flex-col items-center justify-start">
+
+    <!-- 顶栏标题 (卡片式，移除滤镜还原Logo原色) -->
+    <div class="w-full max-w-6xl mb-6 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 relative">
+        <a href="index.html"
+            class="absolute right-6 top-6 flex items-center gap-2 text-sm font-semibold text-slate-400 hover:text-blue-400 bg-slate-800/50 border border-slate-700 px-3 py-1.5 rounded-lg transition-all z-10">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                <polyline points="9 22 9 12 15 12 15 22"></polyline>
+            </svg>
+            返回工具箱
+        </a>
+        <div class="flex items-center">
+            <img src="IBI_Logo_Dark.png" alt="IBI Logo" class="h-10 w-auto mr-4 object-contain">
+            <div class="h-8 w-px bg-slate-200 mr-4"></div> <!-- 垂直分隔线 -->
+            <h1 class="text-3xl font-black text-slate-800 tracking-tight leading-none">
+                动平衡去重工作站
+            </h1>
+        </div>
+        <p class="text-slate-400 mt-3 ml-1 flex items-center text-xs font-semibold uppercase tracking-widest">
+            ISO 1940 标准计算 / 实体去重指导系统
+        </p>
+    </div>
+
+    <div class="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <!-- ======================= 阶段一 ======================= -->
+        <div class="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden flex flex-col h-full">
+            <div class="bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+                <h2 class="font-bold text-lg text-slate-800">阶段 1：平衡机参数测算</h2>
+                <span
+                    class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded border border-blue-200">ISO
+                    1940</span>
+            </div>
+
+            <div class="p-6 flex-1 flex flex-col justify-between">
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <!-- 平衡等级 -->
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">平衡品质
+                                (G)</label>
+                            <select id="balanceGrade"
+                                class="w-full text-sm rounded bg-slate-50 border-slate-200 border p-2.5 focus:ring-2 focus:ring-blue-500">
+                                <option value="0.4">G0.4</option>
+                                <option value="1.0">G1.0</option>
+                                <option value="2.5" selected>G2.5</option>
+                                <option value="6.3">G6.3</option>
+                                <option value="16">G16</option>
+                            </select>
+                        </div>
+                        <!-- 工件重量 -->
+                        <div>
+                            <label
+                                class="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">工件合计重量</label>
+                            <div class="relative">
+                                <input type="number" id="rotorWeight" step="0.1" value="10"
+                                    class="w-full text-sm rounded bg-slate-50 border-slate-200 border p-2.5 pr-8 focus:ring-2 focus:ring-blue-500 font-mono">
+                                <span class="absolute right-3 top-2.5 text-xs text-slate-400 font-semibold">kg</span>
+                            </div>
+                        </div>
+                        <!-- 工作转速 -->
+                        <div>
+                            <label
+                                class="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">最高工作转速</label>
+                            <div class="relative">
+                                <input type="number" id="operatingSpeed" step="10" value="20000"
+                                    class="w-full text-sm rounded bg-slate-50 border-slate-200 border p-2.5 pr-12 focus:ring-2 focus:ring-blue-500 font-mono text-blue-700 font-bold">
+                                <span class="absolute right-3 top-2.5 text-xs text-slate-400 font-semibold">rpm</span>
+                            </div>
+                        </div>
+                        <!-- 去重面数 -->
+                        <div>
+                            <label
+                                class="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">校正平面</label>
+                            <select id="planeMode"
+                                class="w-full text-sm rounded bg-slate-50 border-slate-200 border p-2.5 focus:ring-2 focus:ring-blue-500 font-medium">
+                                <option value="1">单面 (100%)</option>
+                                <option value="2">双面 (各分配 50%)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="pt-4 mt-2 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- 去重半径 A -->
+                        <div>
+                            <label id="labelRadiusA"
+                                class="block text-xs font-medium text-blue-600 uppercase tracking-wider mb-2 font-bold">▶
+                                实际去重操作半径</label>
+                            <div class="relative">
+                                <input type="number" id="actualRadiusA" step="0.1" value="50"
+                                    class="w-full text-lg rounded-lg bg-blue-50 border-blue-200 border p-3 pr-12 focus:ring-2 focus:ring-blue-500 font-mono text-slate-800 font-bold">
+                                <span class="absolute right-3 top-3.5 text-sm text-blue-400 font-semibold">mm</span>
+                            </div>
+                        </div>
+                        <!-- 去重半径 B (双面模式时显示) -->
+                        <div id="containerRadiusB" class="hidden">
+                            <label
+                                class="block text-xs font-medium text-blue-600 uppercase tracking-wider mb-2 font-bold">▶
+                                实际去重操作半径 (面B)</label>
+                            <div class="relative">
+                                <input type="number" id="actualRadiusB" step="0.1" value="50"
+                                    class="w-full text-lg rounded-lg bg-blue-50 border-blue-200 border p-3 pr-12 focus:ring-2 focus:ring-blue-500 font-mono text-slate-800 font-bold">
+                                <span class="absolute right-3 top-3.5 text-sm text-blue-400 font-semibold">mm</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 许用不平衡力矩结果块 -->
+                <div
+                    class="mt-6 bg-slate-800 rounded-xl p-5 text-center shadow-inner relative overflow-hidden flex flex-col items-center justify-center">
+                    <div class="absolute -right-4 -top-4 w-24 h-24 bg-blue-500/10 rounded-full blur-xl"></div>
+                    <p class="text-xs text-slate-400 font-semibold tracking-widest uppercase mb-1 relative z-10 w-full">
+                        输入至平衡机的判定基准上限</p>
+
+                    <div class="flex items-baseline justify-center relative z-10 w-full pt-2">
+                        <!-- 面A 结果 -->
+                        <div class="flex flex-col items-center">
+                            <p id="labelUperA" class="text-xs text-slate-500 hidden mb-1 font-bold">面 A</p>
+                            <div class="flex items-baseline">
+                                <span id="permissibleMassDisplayA"
+                                    class="text-5xl font-black text-emerald-400 tracking-tight font-mono">0.0</span>
+                                <span class="text-lg text-emerald-600 font-bold ml-1">mg</span>
+                            </div>
+                        </div>
+
+                        <!-- 面B 结果 (双面时显示) -->
+                        <div id="resultBlockB" class="hidden flex-col items-center ml-8 border-l border-slate-700 pl-8">
+                            <p class="text-xs text-slate-500 font-bold mb-1">面 B</p>
+                            <div class="flex items-baseline">
+                                <span id="permissibleMassDisplayB"
+                                    class="text-5xl font-black text-emerald-400 tracking-tight font-mono">0.0</span>
+                                <span class="text-lg text-emerald-600 font-bold ml-1">mg</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div
+                        class="mt-4 flex justify-center space-x-4 text-xs text-slate-500 border-t border-slate-700 pt-3 w-full">
+                        <span>总许力矩: <span id="totalUperDisplay" class="font-mono text-slate-300">0.00</span> g·mm</span>
+                        <span>单面许力矩(50%): <span id="planeUperDisplay" class="font-mono text-slate-300">0.00</span>
+                            g·mm</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ======================= 阶段二 ======================= -->
+        <div
+            class="bg-slate-900 rounded-2xl shadow-xl border border-slate-800 overflow-hidden flex flex-col h-full text-white">
+            <div class="bg-slate-800/80 border-b border-slate-700 px-6 py-4 flex items-center justify-between">
+                <h2 class="font-bold text-lg text-slate-200">阶段 2：去重执行策略</h2>
+                <div class="flex items-center space-x-2">
+                    <span class="relative flex h-3 w-3">
+                        <span
+                            class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                    </span>
+                    <span class="text-amber-500 text-xs font-semibold">待钻孔</span>
+                </div>
+            </div>
+
+            <div class="p-6 flex-1 flex flex-col justify-between">
+                <div class="space-y-5">
+                    <!-- 平衡机读数输入 (毫克) -->
+                    <div
+                        class="bg-slate-800 p-4 rounded-xl border border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.05)]">
+                        <label class="block text-sm font-semibold text-amber-500 mb-2">平衡机显示的待去重质量 (超差值)</label>
+                        <div class="relative">
+                            <input type="number" id="measuredMassAmount" step="1" placeholder="填入平衡机读数..."
+                                class="w-full text-2xl rounded-lg bg-slate-900 border-slate-600 border p-4 pr-16 focus:ring-2 focus:ring-amber-500 font-mono text-white placeholder-slate-600 font-bold outline-none">
+                            <span class="absolute right-4 top-4 text-xl text-slate-400 font-bold">mg</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <!-- 材质与体积 -->
+                        <div>
+                            <label
+                                class="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">去重材质</label>
+                            <select id="materialSelect"
+                                class="w-full text-sm rounded bg-slate-800 border-slate-700 border p-3 focus:ring-2 focus:ring-blue-500 text-slate-200">
+                                <option value="7.85">钢 (7.85 g/cm³)</option>
+                                <option value="2.7">铝合金 (2.70 g/cm³)</option>
+                                <option value="7.3">铸铁 (7.30 g/cm³)</option>
+                                <option value="8.9">紫铜 (8.90 g/cm³)</option>
+                                <option value="4.5">钛合金 (4.50 g/cm³)</option>
+                                <option value="8.4">英克奈尔合金 (8.40 g/cm³)</option>
+                                <option value="custom">自定义密度...</option>
+                            </select>
+                        </div>
+
+                        <!-- 钻头大小 -->
+                        <div>
+                            <label
+                                class="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">选用钻头</label>
+                            <select id="drillSize"
+                                class="w-full text-sm rounded bg-slate-800 border-slate-700 border p-3 focus:ring-2 focus:ring-blue-500 text-slate-200 font-bold text-blue-400">
+                                <option value="4">Ø 4.0 mm</option>
+                                <option value="5">Ø 5.0 mm</option>
+                                <option value="6">Ø 6.0 mm</option>
+                                <option value="8">Ø 8.0 mm</option>
+                                <option value="10">Ø 10.0 mm</option>
+                            </select>
+                        </div>
+
+                        <!-- 隐藏的自定义密度框 -->
+                        <div id="customDensityContainer" class="hidden col-span-2">
+                            <label class="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">自定义密度
+                                (g/cm³)</label>
+                            <input type="number" id="customDensity" step="0.01" value="7.85"
+                                class="w-full text-sm rounded bg-slate-800 border-slate-700 border p-3 focus:ring-2 focus:ring-blue-500 text-slate-200 outline-none">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 最终钻孔深度显示 -->
+                <div class="mt-6">
+                    <div class="flex items-end justify-between mb-2">
+                        <p class="text-sm font-semibold text-slate-300">目标钻孔深度 <span
+                                class="text-xs text-slate-500 font-normal">(平底)</span></p>
+                        <p class="text-xs text-slate-500">排量: <span id="volumeDisplay"
+                                class="font-mono text-slate-400">0</span> mm³</p>
+                    </div>
+                    <div
+                        class="bg-gradient-to-r from-blue-900/50 to-slate-900 border border-blue-500/40 rounded-xl p-6 flex items-baseline justify-center space-x-2 shadow-lg">
+                        <span id="depthResult" class="text-7xl font-black text-white tracking-tighter font-mono"
+                            style="text-shadow: 0 4px 20px rgba(59,130,246,0.5);">0.00</span>
+                        <span class="text-2xl text-blue-400 font-bold">mm</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // --- 阶段 1 DOM ---
+            const balanceGrade = document.getElementById('balanceGrade');
+            const rotorWeight = document.getElementById('rotorWeight');
+            const operatingSpeed = document.getElementById('operatingSpeed');
+            const planeMode = document.getElementById('planeMode');
+
+            const labelRadiusA = document.getElementById('labelRadiusA');
+            const containerRadiusB = document.getElementById('containerRadiusB');
+            const actualRadiusA = document.getElementById('actualRadiusA');
+            const actualRadiusB = document.getElementById('actualRadiusB');
+
+            const labelUperA = document.getElementById('labelUperA');
+            const resultBlockB = document.getElementById('resultBlockB');
+            const permissibleMassDisplayA = document.getElementById('permissibleMassDisplayA');
+            const permissibleMassDisplayB = document.getElementById('permissibleMassDisplayB');
+
+            const totalUperDisplay = document.getElementById('totalUperDisplay');
+            const planeUperDisplay = document.getElementById('planeUperDisplay');
+
+            // --- 阶段 2 DOM ---
+            const measuredMassAmount = document.getElementById('measuredMassAmount');
+            const materialSelect = document.getElementById('materialSelect');
+            const customDensityContainer = document.getElementById('customDensityContainer');
+            const customDensity = document.getElementById('customDensity');
+            const drillSize = document.getElementById('drillSize');
+
+            const depthResult = document.getElementById('depthResult');
+            const volumeDisplay = document.getElementById('volumeDisplay');
+
+            // 监听所有的输入变化，实行实时计算
+            const inputsStage1 = [balanceGrade, rotorWeight, operatingSpeed, planeMode, actualRadiusA, actualRadiusB];
+            const inputsStage2 = [measuredMassAmount, materialSelect, customDensity, drillSize];
+
+            inputsStage1.forEach(el => el.addEventListener('input', () => { saveConfig(); calculateStage1(); }));
+            inputsStage2.forEach(el => el.addEventListener('input', () => { saveConfig(); calculateStage2(); }));
+
+            materialSelect.addEventListener('change', (e) => {
+                if (e.target.value === 'custom') {
+                    customDensityContainer.classList.remove('hidden');
+                } else {
+                    customDensityContainer.classList.add('hidden');
+                }
+            });
+
+            // 控制双面半径 UI 动态显隐
+            const updatePlaneModeUI = () => {
+                if (planeMode.value === '2') {
+                    containerRadiusB.classList.remove('hidden');
+                    labelRadiusA.textContent = '▶ 实际去重操作半径 (面A)';
+                    labelUperA.classList.remove('hidden');
+                    resultBlockB.classList.remove('hidden');
+                    resultBlockB.classList.add('flex');
+                } else {
+                    containerRadiusB.classList.add('hidden');
+                    labelRadiusA.textContent = '▶ 实际去重操作半径 (R)';
+                    labelUperA.classList.add('hidden');
+                    resultBlockB.classList.add('hidden');
+                    resultBlockB.classList.remove('flex');
+                }
+            };
+            planeMode.addEventListener('change', updatePlaneModeUI);
+
+            // --- LocalStorage 配置管理 ---
+            const loadConfig = () => {
+                const config = JSON.parse(localStorage.getItem('balanceStationSettings')) || {};
+
+                if (config.balanceGrade) balanceGrade.value = config.balanceGrade;
+                if (config.rotorWeight) rotorWeight.value = config.rotorWeight;
+                if (config.operatingSpeed) operatingSpeed.value = config.operatingSpeed;
+                if (config.planeMode) planeMode.value = config.planeMode;
+
+                if (config.actualRadiusA) actualRadiusA.value = config.actualRadiusA;
+                if (config.actualRadiusB) actualRadiusB.value = config.actualRadiusB;
+
+                if (config.material) materialSelect.value = config.material;
+                if (config.customDensityStr) customDensity.value = config.customDensityStr;
+                if (config.drillSize) drillSize.value = config.drillSize;
+
+                // Trigger UI states
+                updatePlaneModeUI();
+                if (materialSelect.value === 'custom') customDensityContainer.classList.remove('hidden');
+            };
+
+            const saveConfig = () => {
+                const config = {
+                    balanceGrade: balanceGrade.value,
+                    rotorWeight: rotorWeight.value,
+                    operatingSpeed: operatingSpeed.value,
+                    planeMode: planeMode.value,
+                    actualRadiusA: actualRadiusA.value,
+                    actualRadiusB: actualRadiusB.value,
+                    material: materialSelect.value,
+                    customDensityStr: customDensity.value,
+                    drillSize: drillSize.value
+                };
+                localStorage.setItem('balanceStationSettings', JSON.stringify(config));
+            };
+
+            // ==========================================
+            // 核心计算 1：计算许用规则 (ISO 1940)
+            // ==========================================
+            const calculateStage1 = () => {
+                const G = parseFloat(balanceGrade.value) || 0;
+                const M_kg = parseFloat(rotorWeight.value) || 0;
+                const N_rpm = parseFloat(operatingSpeed.value) || 0;
+                const planes = parseInt(planeMode.value) || 1;
+                const R_A_mm = parseFloat(actualRadiusA.value) || 0;
+                const R_B_mm = parseFloat(actualRadiusB.value) || 0;
+
+                if (!M_kg || !N_rpm || !R_A_mm) {
+                    permissibleMassDisplayA.textContent = "0.0";
+                    permissibleMassDisplayB.textContent = "0.0";
+                    totalUperDisplay.textContent = "0.00";
+                    planeUperDisplay.textContent = "0.00";
+                    return;
+                }
+
+                // 1. 计算总许用不平衡力矩 U_per_total (g·mm)
+                // U_per = 9549 * G * M / N
+                const U_per_total = (9549 * G * M_kg) / N_rpm;
+
+                // 2. 力矩按面数分配 (如果是双面则各50%)
+                const U_per_plane = planes === 2 ? U_per_total / 2 : U_per_total;
+
+                // 3. 将力矩折算成当前工作半径下的质量！(mg)
+                // Mass (g) = U / R, 转换为毫克(mg) 需要乘以 1000
+                const permissibleMassA_mg = (U_per_plane / R_A_mm) * 1000;
+                permissibleMassDisplayA.textContent = permissibleMassA_mg.toFixed(1);
+
+                if (planes === 2 && R_B_mm > 0) {
+                    const permissibleMassB_mg = (U_per_plane / R_B_mm) * 1000;
+                    permissibleMassDisplayB.textContent = permissibleMassB_mg.toFixed(1);
+                }
+
+                // 更新力矩参考界面
+                totalUperDisplay.textContent = U_per_total.toFixed(2);
+                planeUperDisplay.textContent = U_per_plane.toFixed(2);
+            };
+
+            // ==========================================
+            // 核心计算 2：计算钻孔深度
+            // ==========================================
+            const calculateStage2 = () => {
+                // 注意：这里拿到的单位已经是毫克 (mg)
+                const amount_mg = parseFloat(measuredMassAmount.value) || 0;
+                const drillD = parseFloat(drillSize.value) || 0;
+
+                let densityGperCm3 = parseFloat(materialSelect.value) || 0;
+                if (materialSelect.value === 'custom') densityGperCm3 = parseFloat(customDensity.value) || 0;
+
+                if (!amount_mg || !drillD || !densityGperCm3) {
+                    depthResult.textContent = "0.00";
+                    volumeDisplay.textContent = "0";
+                    return;
+                }
+
+                // 将输入填写的 毫克(mg) 转为 克(g) 用作后续的标准质量运算
+                const amount_g = amount_mg / 1000;
+
+                // 体积运算 mm³
+                const densityGperMm3 = densityGperCm3 / 1000;
+                const volumeMm3 = amount_g / densityGperMm3;
+
+                // 圆柱体深度计算 mm
+                const drillRadius = drillD / 2;
+                const drillArea = Math.PI * Math.pow(drillRadius, 2);
+                const depthMm = volumeMm3 / drillArea;
+
+                depthResult.textContent = depthMm.toFixed(2);
+                volumeDisplay.textContent = Math.round(volumeMm3);
+            };
+
+            // 初始化加载
+            loadConfig();
+            calculateStage1();
+            calculateStage2();
+        });
+    </script>
+</body>
+
+</html>

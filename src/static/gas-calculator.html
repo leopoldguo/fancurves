@@ -1,0 +1,1543 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#eef2fb" />
+  <title data-i18n="appTitle">通用气体计算软件</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html,
+    body {
+      height: 100%;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+      background: #1e2535;
+      min-height: 100vh;
+      padding: 16px;
+      padding-bottom: 32px;
+    }
+
+    /* ===== Language Switcher ===== */
+    .language-switcher {
+      position: fixed;
+      top: 16px;
+      right: 20px;
+      z-index: 1000;
+      display: flex;
+      gap: 4px;
+      background: rgba(30, 37, 53, 0.9);
+      border: 1px solid #3a4760;
+      border-radius: 10px;
+      padding: 4px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .lang-btn {
+      padding: 5px 12px;
+      border: none;
+      border-radius: 7px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      background: transparent;
+      color: #8b9bb4;
+      transition: all 0.15s;
+    }
+
+    .lang-btn.active {
+      background: #2563eb;
+      color: #fff;
+    }
+
+    /* ===== Page Wrapper ===== */
+    .page-wrapper {
+      max-width: 1080px;
+      margin: 0 auto;
+    }
+
+    /* ===== Header Card ===== */
+    .header-card {
+      background: #252f44;
+      border-radius: 18px;
+      border: 1px solid #3a4760;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+      padding: 18px 24px 14px;
+      margin-bottom: 16px;
+    }
+
+    .header-inner {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 6px;
+    }
+
+    .header-logo {
+      height: 42px;
+      width: auto;
+    }
+
+    .header-divider {
+      width: 2px;
+      height: 36px;
+      background: #e2e8f0;
+      border-radius: 2px;
+    }
+
+    .header-card h1 {
+      font-size: 22px;
+      font-weight: 800;
+      color: #f8fafc;
+      letter-spacing: -0.3px;
+    }
+
+    .header-subtitle {
+      font-size: 12px;
+      color: #94a3b8;
+      font-weight: 500;
+      margin-left: 70px;
+    }
+
+    /* ===== Main 2-Column Grid ===== */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      align-items: stretch;
+      /* equal height */
+    }
+
+    @media (max-width: 768px) {
+      .main-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .header-subtitle {
+        margin-left: 0;
+      }
+    }
+
+    /* ===== Left Panel (white) ===== */
+    .left-panel {
+      background: #252f44;
+      border-radius: 18px;
+      border: 1px solid #3a4760;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ===== Right Panel (dark) ===== */
+    .right-panel {
+      background: #0f172a;
+      border-radius: 18px;
+      border: 1px solid #1e293b;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ===== Panel Header ===== */
+    .panel-header {
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      /* Center the heading */
+      border-bottom: 1px solid #3a4760;
+      background: #1e2535;
+    }
+
+    .panel-header--dark {
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+    }
+
+    .panel-heading {
+      font-size: 16px;
+      /* Increased font size */
+      font-weight: 800;
+      /* Made slightly bolder to match bigger size */
+      color: #e2e8f0;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .panel-heading--dark {
+      color: #94a3b8;
+    }
+
+    /* ===== Panel Body ===== */
+    .panel-body {
+      padding: 16px 20px;
+      flex: 1;
+      /* stretch to fill remaining height */
+    }
+
+    /* ===== Param Group (sections inside left panel) ===== */
+    .param-group {
+      padding-bottom: 14px;
+      margin-bottom: 14px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .param-group:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    /* Group label (small uppercase like balance.html) */
+    .group-label {
+      font-size: 10px;
+      font-weight: 800;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 10px;
+    }
+
+    /* ===== Param Field ===== */
+    .param-field {
+      margin-bottom: 9px;
+    }
+
+    .param-field:last-child {
+      margin-bottom: 0;
+    }
+
+    .param-label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: #8b9bb4;
+      margin-bottom: 4px;
+    }
+
+    /* Joined input + select */
+    .param-joined {
+      display: flex;
+      align-items: stretch;
+    }
+
+    .param-joined .param-input {
+      flex: 1;
+      min-width: 0;
+      border-top-right-radius: 0;
+      border-bottom-right-radius: 0;
+      border-right: none;
+    }
+
+    .param-joined .param-select {
+      width: auto;
+      min-width: 80px;
+      border-top-left-radius: 0;
+      border-bottom-left-radius: 0;
+    }
+
+    .param-input {
+      width: 100%;
+      padding: 8px 10px;
+      border: 2px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 13px;
+      font-family: 'Consolas', 'SF Mono', monospace;
+      font-weight: 500;
+      color: #e2e8f0;
+      background: #1e2535;
+      transition: all 0.15s;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    .param-input:focus {
+      outline: none;
+      border-color: #f8fafc;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+      background: #0f172a;
+      color: #f8fafc;
+    }
+
+    .param-input:hover {
+      border-color: #94a3b8;
+    }
+
+    .param-select {
+      width: 100%;
+      padding: 8px 28px 8px 10px;
+      border: 2px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #e2e8f0;
+      background: #1e2535 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 8px center;
+      -webkit-appearance: none;
+      appearance: none;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .param-select:focus {
+      outline: none;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
+    .param-select:hover {
+      border-color: #94a3b8;
+    }
+
+    .param-abs-info {
+      font-size: 10px;
+      color: #94a3b8;
+      margin-top: 3px;
+    }
+
+    /* 2-column grid inside a param-group */
+    .param-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .param-2col .param-field {
+      margin-bottom: 0;
+    }
+
+    /* full-width item inside 2col grid */
+    .param-col-full {
+      grid-column: 1 / -1;
+    }
+
+    /* ===== Right Panel: Density info block ===== */
+    .density-block {
+      background: #1e293b;
+      border-radius: 10px;
+      padding: 11px 14px;
+      margin-bottom: 20px;
+    }
+
+    .density-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 0;
+      border-bottom: 1px solid #334155;
+    }
+
+    .density-row:last-child {
+      border-bottom: none;
+    }
+
+    .density-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .density-value-wrap {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .density-value {
+      font-size: 13px;
+      font-weight: 700;
+      color: #94a3b8;
+      font-family: 'Consolas', monospace;
+    }
+
+    .density-unit-select {
+      font-size: 10px !important;
+      padding: 2px 20px 2px 6px !important;
+      background-color: rgba(255, 255, 255, 0.08) !important;
+      color: #94a3b8 !important;
+      -webkit-text-fill-color: #94a3b8 !important;
+      border-color: rgba(255, 255, 255, 0.15) !important;
+      border-radius: 5px !important;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+      background-repeat: no-repeat !important;
+      background-position: right 5px center !important;
+      -webkit-appearance: none !important;
+      appearance: none !important;
+    }
+
+    .density-unit-select option {
+      background-color: #e2e8f0;
+      color: #fff;
+    }
+
+    /* ===== Right Panel: Result items ===== */
+    .result-group {
+      margin-bottom: 18px;
+    }
+
+    .result-group:last-child {
+      margin-bottom: 0;
+    }
+
+    .result-group-label {
+      font-size: 10px;
+      font-weight: 800;
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+    }
+
+    /* Big value box (for power) */
+    .result-big-box {
+      background: #1e293b;
+      border-radius: 10px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .result-big-value {
+      font-size: 28px;
+      font-weight: 800;
+      color: #f1f5f9;
+      font-family: 'Consolas', monospace;
+      letter-spacing: -1px;
+    }
+
+    .result-big-unit-select {
+      width: 90px !important;
+      font-size: 14px !important;
+      padding: 6px 32px 6px 12px !important;
+      background-color: rgba(0, 0, 0, 0.35) !important;
+      color: #ffffff !important;
+      -webkit-text-fill-color: #ffffff !important;
+      border: 2px solid rgba(255, 255, 255, 0.3) !important;
+      border-radius: 8px !important;
+      font-weight: 700 !important;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+      background-repeat: no-repeat !important;
+      background-position: right 8px center !important;
+      -webkit-appearance: none !important;
+      appearance: none !important;
+    }
+
+    .result-big-unit-select option {
+      background-color: #e2e8f0;
+      color: #fff;
+    }
+
+    /* Compact result row */
+    .result-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 7px 0;
+      border-bottom: 1px solid #1e293b;
+    }
+
+    .result-row:last-child {
+      border-bottom: none;
+    }
+
+    .result-row-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #475569;
+    }
+
+    .result-row-value {
+      font-size: 13px;
+      font-weight: 700;
+      color: #94a3b8;
+      font-family: 'Consolas', monospace;
+    }
+
+    /* Install banner */
+    .install-banner {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #1e293b;
+      color: #fff;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transform: translateY(100%);
+      transition: transform 0.3s ease;
+      z-index: 999;
+      box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .install-banner.show {
+      transform: translateY(0);
+    }
+
+    .install-banner-content h3 {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .install-banner-content p {
+      font-size: 12px;
+      color: #94a3b8;
+    }
+
+    .install-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .install-btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .install-btn-secondary {
+      background: transparent;
+      color: #94a3b8;
+      border: 1px solid #334155;
+    }
+
+    .install-btn-primary {
+      background: #2563eb;
+      color: #fff;
+    }
+
+    .safe-area-bottom {
+      height: env(safe-area-inset-bottom, 0px);
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Language Switcher -->
+  <div class="language-switcher">
+    <button class="lang-btn active" id="lang-zh" onclick="switchLanguage('zh')">中文</button>
+    <button class="lang-btn" id="lang-en" onclick="switchLanguage('en')">English</button>
+  </div>
+
+  <div class="page-wrapper">
+
+    <!-- Header -->
+    <div class="header-card" style="position: relative;">
+      <a href="index.html"
+        style="position: absolute; right: 20px; top: 20px; text-decoration: none; color: #8b9bb4; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid #3a4760; transition: all 0.2s; z-index: 10;">
+        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+          <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
+        返回工具箱
+      </a>
+      <div class="header-inner">
+        <img src="IBI_Logo_Dark.png" alt="IBI Logo" class="header-logo">
+        <div class="header-divider"></div>
+        <h1 data-i18n="appTitle">通用气体计算软件</h1>
+      </div>
+      <p class="header-subtitle">多工质气体热力学参数 / 绝热压缩功率计算</p>
+    </div>
+
+    <!-- 2-Column Main Grid -->
+    <div class="main-grid">
+
+      <!-- ======== LEFT PANEL: Parameters ======== -->
+      <div class="left-panel">
+        <div class="panel-header">
+          <span class="panel-heading" data-i18n="paramSettings">参数设置</span>
+        </div>
+        <div class="panel-body">
+
+          <!-- GROUP: Gas Settings (includes ref pressure) -->
+          <div class="param-group">
+            <div class="group-label" data-i18n="gasSettings">Gas Settings</div>
+
+            <!-- Row 1: Gas selector | Reference pressure (2-col) -->
+            <div class="param-2col" style="margin-bottom:8px;">
+              <div class="param-field">
+                <label class="param-label" data-i18n="selectGas">选择气体</label>
+                <select id="gasSelect" class="param-select">
+                  <option value="air" data-i18n="air">空气</option>
+                  <option value="nitrogen" data-i18n="nitrogen">氮气 (N₂)</option>
+                  <option value="oxygen" data-i18n="oxygen">氧气 (O₂)</option>
+                  <option value="carbonDioxide" data-i18n="carbonDioxide">二氧化碳 (CO₂)</option>
+                  <option value="hydrogen" data-i18n="hydrogen">氢气 (H₂)</option>
+                  <option value="helium" data-i18n="helium">氦气 (He)</option>
+                  <option value="argon" data-i18n="argon">氩气 (Ar)</option>
+                  <option value="methane" data-i18n="methane">甲烷 (CH₄)</option>
+                  <option value="propane" data-i18n="propane">丙烷 (C₃H₈)</option>
+                  <option value="custom" data-i18n="custom">自定义</option>
+                </select>
+              </div>
+              <div class="param-field">
+                <label class="param-label" data-i18n="refPressure">参考气压</label>
+                <div class="param-joined">
+                  <input type="number" id="refPressure" class="param-input" value="101.325" step="0.001">
+                  <select id="refPressureUnit" class="param-select">
+                    <option value="kPa" data-i18n="kPa">千帕 (kPa)</option>
+                    <option value="MPa" data-i18n="MPa">兆帕 (MPa)</option>
+                    <option value="bar" data-i18n="bar">巴 (bar)</option>
+                    <option value="atm" data-i18n="atm">大气压 (atm)</option>
+                    <option value="psi" data-i18n="psi">磅/平方英寸 (psi)</option>
+                    <option value="Pa" data-i18n="Pa">帕斯卡 (Pa)</option>
+
+                    <option value="mmH2O" data-i18n="mmH2O">mmH₂O</option>
+                    <option value="inH2O" data-i18n="inH2O">inH₂O</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Row 2: Molar mass | Gamma (2-col) -->
+            <div class="param-2col">
+              <div class="param-field">
+                <label class="param-label" data-i18n="molarMass">分子量 (g/mol)</label>
+                <input type="number" id="molarMass" class="param-input" value="28.964" step="0.001">
+              </div>
+              <div class="param-field">
+                <label class="param-label" data-i18n="adiabaticIndex">绝热指数 γ</label>
+                <input type="number" id="adiabaticIndex" class="param-input" value="1.4" step="0.01">
+              </div>
+            </div>
+          </div>
+
+          <!-- GROUP: Pressure (2-col: inlet | outlet) -->
+          <div class="param-group">
+            <div class="group-label" data-i18n="pressureParams">Pressure</div>
+            <div class="param-2col">
+              <div class="param-field">
+                <label class="param-label" data-i18n="inletPressure">入口压力 (表压)</label>
+                <div class="param-joined">
+                  <input type="number" id="inletPressure" class="param-input" value="0" step="0.001">
+                  <select id="pressureUnit" class="param-select">
+                    <option value="kPa" data-i18n="kPa">kPa</option>
+                    <option value="MPa" data-i18n="MPa">MPa</option>
+                    <option value="bar" data-i18n="bar">bar</option>
+                    <option value="atm" data-i18n="atm">atm</option>
+                    <option value="psi" data-i18n="psi">psi</option>
+                    <option value="Pa" data-i18n="Pa">Pa</option>
+
+                    <option value="mmH2O" data-i18n="mmH2O">mmH₂O</option>
+                    <option value="inH2O" data-i18n="inH2O">inH₂O</option>
+                  </select>
+                </div>
+                <div class="param-abs-info" id="inletAbs" data-i18n="absolutePressure">绝对压力：101.33 kPa</div>
+              </div>
+              <div class="param-field">
+                <label class="param-label" data-i18n="outletPressure">出口压力 (表压)</label>
+                <div class="param-joined">
+                  <input type="number" id="outletPressure" class="param-input" value="0" step="0.001">
+                  <select id="outletPressureUnit" class="param-select">
+                    <option value="kPa" data-i18n="kPa">kPa</option>
+                    <option value="MPa" data-i18n="MPa">MPa</option>
+                    <option value="bar" data-i18n="bar">bar</option>
+                    <option value="atm" data-i18n="atm">atm</option>
+                    <option value="psi" data-i18n="psi">psi</option>
+                    <option value="Pa" data-i18n="Pa">Pa</option>
+
+                    <option value="mmH2O" data-i18n="mmH2O">mmH₂O</option>
+                    <option value="inH2O" data-i18n="inH2O">inH₂O</option>
+                  </select>
+                </div>
+                <div class="param-abs-info" id="outletAbs" data-i18n="absolutePressure">绝对压力：101.33 kPa</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- GROUP: Other Params — Temperature & Flow & Efficiency (2-col rows) -->
+          <div class="param-group">
+            <div class="group-label" data-i18n="otherParams">Other Params</div>
+
+            <!-- Row 1: inlet temp | flow type -->
+            <div class="param-2col" style="margin-bottom:8px;">
+              <div class="param-field">
+                <label class="param-label" data-i18n="inletTemp">入口温度</label>
+                <div class="param-joined">
+                  <input type="number" id="inletTemp" class="param-input" value="25" step="0.1">
+                  <select id="tempUnit" class="param-select">
+                    <option value="C" data-i18n="celsius">°C</option>
+                    <option value="K" data-i18n="kelvin">K</option>
+                    <option value="F" data-i18n="fahrenheit">°F</option>
+                  </select>
+                </div>
+              </div>
+              <div class="param-field">
+                <label class="param-label" data-i18n="flowType">流量类型</label>
+                <select id="flowType" class="param-select">
+                  <option value="mass" data-i18n="massFlow">质量流量</option>
+                  <option value="volume" data-i18n="volumeFlow">体积流量</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Row 2: flow value | efficiency (2-col) -->
+            <div class="param-2col">
+              <!-- Mass flow (shown by default) -->
+              <div id="massFlowGroup">
+                <div class="param-field">
+                  <label class="param-label" data-i18n="massFlowLabel">质量流量</label>
+                  <div class="param-joined">
+                    <input type="number" id="massFlow" class="param-input" value="1" step="0.001">
+                    <select id="massFlowUnit" class="param-select">
+                      <option value="kg_s" data-i18n="kg_s">kg/s</option>
+                      <option value="kg_min" data-i18n="kg_min">kg/min</option>
+                      <option value="kg_h" data-i18n="kg_h">kg/h</option>
+                      <option value="g_s" data-i18n="g_s">g/s</option>
+                      <option value="lb_s" data-i18n="lb_s">lb/s</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <!-- Volume flow (hidden by default) -->
+              <div id="volumeFlowGroup" style="display:none;">
+                <div class="param-field">
+                  <label class="param-label" data-i18n="volumeFlowLabel">体积流量</label>
+                  <div class="param-joined">
+                    <input type="number" id="volumeFlow" class="param-input" value="1" step="0.001">
+                    <select id="volumeFlowUnit" class="param-select">
+                      <option value="m3_s" data-i18n="m3_s">m³/s</option>
+                      <option value="m3_min" data-i18n="m3_min">m³/min</option>
+                      <option value="m3_h" data-i18n="m3_h">m³/h</option>
+                      <option value="L_s" data-i18n="L_s">L/s</option>
+                      <option value="L_min" data-i18n="L_min">L/min</option>
+                      <option value="cfm" data-i18n="cfm">CFM</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="param-field" style="margin-top:6px;">
+                  <label class="param-label" data-i18n="volumeFlowTypeLabel">体积基准</label>
+                  <select id="volumeFlowType" class="param-select">
+                    <option value="standard20" data-i18n="standard20">标方 20°C</option>
+                    <option value="standard0" data-i18n="standard0">标方 0°C</option>
+                    <option value="actual" data-i18n="actual">实际入口</option>
+                  </select>
+                </div>
+              </div>
+              <!-- Efficiency -->
+              <div class="param-field">
+                <label class="param-label" data-i18n="adiabaticEfficiency">绝热效率</label>
+                <div class="param-joined">
+                  <input type="number" id="efficiency" class="param-input" value="80" step="0.01" min="0" max="100">
+                  <span
+                    style="display:flex;align-items:center;padding:0 10px;background: #1e2535;border:2px solid #cbd5e1;border-left:none;border-radius:0 8px 8px 0;font-size:13px;font-weight:700;color: #8b9bb4;">%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /panel-body -->
+      </div><!-- /left-panel -->
+
+      <!-- ======== RIGHT PANEL: Results ======== -->
+      <div class="right-panel">
+        <div class="panel-header panel-header--dark">
+          <span class="panel-heading panel-heading--dark" data-i18n="calculationResults">计算结果</span>
+        </div>
+        <div class="panel-body">
+
+          <!-- Gas Density Reference Block -->
+          <div class="result-group">
+            <div class="result-group-label" data-i18n="gasDensity">Gas Density</div>
+            <div class="density-block">
+              <div class="density-row">
+                <span class="density-label" data-i18n="stdDensity20">标态 20°C</span>
+                <div class="density-value-wrap">
+                  <span class="density-value" id="density20">1.2041</span>
+                  <select id="densityUnit20" class="density-unit-select param-select">
+                    <option value="kg_m3">kg/m³</option>
+                    <option value="g_L">g/L</option>
+                    <option value="g_cm3">g/cm³</option>
+                    <option value="lb_ft3">lb/ft³</option>
+                    <option value="lb_gal">lb/gal</option>
+                  </select>
+                </div>
+              </div>
+              <div class="density-row">
+                <span class="density-label" data-i18n="stdDensity0">标态 0°C</span>
+                <div class="density-value-wrap">
+                  <span class="density-value" id="density0">1.2932</span>
+                  <select id="densityUnit0" class="density-unit-select param-select">
+                    <option value="kg_m3">kg/m³</option>
+                    <option value="g_L">g/L</option>
+                    <option value="g_cm3">g/cm³</option>
+                    <option value="lb_ft3">lb/ft³</option>
+                    <option value="lb_gal">lb/gal</option>
+                  </select>
+                </div>
+              </div>
+              <div class="density-row">
+                <span class="density-label" data-i18n="actualInletDensity">实际入口</span>
+                <div class="density-value-wrap">
+                  <span class="density-value" id="densityActual">1.1844</span>
+                  <select id="densityUnitActual" class="density-unit-select param-select">
+                    <option value="kg_m3">kg/m³</option>
+                    <option value="g_L">g/L</option>
+                    <option value="g_cm3">g/cm³</option>
+                    <option value="lb_ft3">lb/ft³</option>
+                    <option value="lb_gal">lb/gal</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Adiabatic Power -->
+          <div class="result-group">
+            <div class="result-group-label" data-i18n="adiabaticPower">Adiabatic Power</div>
+            <div class="result-big-box">
+              <span class="result-big-value" id="adiabaticPower">0.00</span>
+              <select id="powerUnit" class="result-big-unit-select param-select">
+                <option value="kW">kW</option>
+                <option value="W">W</option>
+                <option value="MW">MW</option>
+                <option value="hp">hp</option>
+                <option value="PS">PS</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Shaft Power -->
+          <div class="result-group">
+            <div class="result-group-label" data-i18n="shaftPower">Shaft Power</div>
+            <div class="result-big-box">
+              <span class="result-big-value" id="shaftPower">0.00</span>
+              <select id="shaftPowerUnit" class="result-big-unit-select param-select">
+                <option value="kW">kW</option>
+                <option value="W">W</option>
+                <option value="MW">MW</option>
+                <option value="hp">hp</option>
+                <option value="PS">PS</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Other Results -->
+          <div class="result-group">
+            <div class="result-group-label" data-i18n="otherResults">Other Results</div>
+            <div class="result-row">
+              <span class="result-row-label" data-i18n="outletTemp">出口温度</span>
+              <span class="result-row-value"><span id="outletTemp">0.00</span><span id="outletTempUnitLabel">
+                  °C</span></span>
+            </div>
+            <div class="result-row" id="massFlowResult" style="display:none;">
+              <span class="result-row-label" data-i18n="convertedMassFlow">转换后质量流量</span>
+              <span class="result-row-value" id="massFlowResultValue">0.0000 kg/s</span>
+            </div>
+            <div class="result-row">
+              <span class="result-row-label" data-i18n="actualInletFlow">实际入口流量</span>
+              <span class="result-row-value" id="actualInletFlow">0.0000 m³/h</span>
+            </div>
+            <div class="result-row">
+              <span class="result-row-label" data-i18n="actualOutletFlow">实际出口流量</span>
+              <span class="result-row-value" id="actualOutletFlow">0.0000 m³/h</span>
+            </div>
+          </div>
+
+        </div><!-- /panel-body -->
+      </div><!-- /right-panel -->
+
+    </div><!-- /main-grid -->
+  </div><!-- /page-wrapper -->
+
+  <!-- Install Banner -->
+  <div id="install-banner" class="install-banner">
+    <div class="install-banner-content">
+      <h3 data-i18n="installToDesktop">安装到桌面</h3>
+      <p data-i18n="installPrompt">将此应用添加到主屏幕，方便随时使用！</p>
+    </div>
+    <div class="install-buttons">
+      <button id="install-later" class="install-btn install-btn-secondary" data-i18n="later">稍后</button>
+      <button id="install-now" class="install-btn install-btn-primary" data-i18n="install">安装</button>
+    </div>
+  </div>
+
+  <div class="safe-area-bottom"></div>
+
+  <script>
+    const TRANSLATIONS = {
+      zh: {
+        appTitle: '通用气体计算软件',
+        gasSettings: '气体设置',
+        selectGas: '选择气体',
+        air: '空气',
+        nitrogen: '氮气 (N₂)',
+        oxygen: '氧气 (O₂)',
+        carbonDioxide: '二氧化碳 (CO₂)',
+        hydrogen: '氢气 (H₂)',
+        helium: '氦气 (He)',
+        argon: '氩气 (Ar)',
+        methane: '甲烷 (CH₄)',
+        custom: '自定义气',
+        molarMass: '分子量 (g/mol)',
+        gamma: '绝热指数 γ',
+        refPressureSettings: '参考气压设置',
+        refPressure: '参考气压',
+        kPa: 'kPa',
+        bar: 'bar',
+        psi: 'psi',
+        atm: 'atm',
+        mmHg: 'mmHg',
+        Pa: 'Pa',
+        MPa: 'MPa',
+        mmH2O: '毫米水柱 (mmH₂O)',
+        inH2O: '英寸水柱 (inH₂O)',
+        pressureParams: '压力参数',
+        inletPressure: '入口压力 (表压)',
+        outletPressure: '出口压力 (表压)',
+        absolutePressure: '绝对压力：',
+        tempAndFlow: '温度和流量',
+        inletTemp: '入口温度',
+        celsius: '°C',
+        kelvin: 'K',
+        fahrenheit: '°F',
+        flowType: '流量类型',
+        massFlow: '质量流量',
+        volumeFlow: '体积流量',
+        massFlowLabel: '质量流量',
+        kg_s: 'kg/s',
+        kg_min: 'kg/min',
+        kg_h: 'kg/h',
+        g_s: 'g/s',
+        lb_s: 'lb/s',
+        volumeFlowLabel: '体积流量',
+        m3_s: 'm³/s',
+        m3_min: 'm³/min',
+        m3_h: 'm³/h',
+        L_s: 'L/s',
+        L_min: 'L/min',
+        cfm: 'CFM',
+        volumeFlowTypeLabel: '体积基准',
+        standard20: '标方 20°C',
+        standard0: '标方 0°C',
+        actual: '实际入口',
+        gasDensity: '气体密度',
+        stdDensity20: '标态 20°C',
+        stdDensity0: '标态 0°C',
+        actualInletDensity: '实际入口',
+        otherParams: '其他参数',
+        adiabaticEfficiency: '绝热效率',
+        calculationResults: '计算结果',
+        adiabaticPower: '绝热功率',
+        shaftPower: '轴功率',
+        otherResults: '其他物理量',
+        outletTemp: '出口温度',
+        convertedMassFlow: '转换后质量流量',
+        actualInletFlow: '实际入口流量',
+        actualOutletFlow: '实际出口流量',
+        installToDesktop: '安装到桌面',
+        installPrompt: '将此应用添加到主屏幕，方便随时使用！',
+        later: '稍后',
+        install: '安装'
+      },
+      en: {
+        appTitle: 'Gas Calculator',
+        gasSettings: 'GAS SETTINGS',
+        selectGas: 'Select Gas',
+        air: 'Air',
+        nitrogen: 'Nitrogen (N₂)',
+        oxygen: 'Oxygen (O₂)',
+        carbonDioxide: 'CO₂',
+        hydrogen: 'Hydrogen (H₂)',
+        helium: 'Helium (He)',
+        argon: 'Argon (Ar)',
+        methane: 'Methane (CH₄)',
+        custom: 'Custom Gas',
+        molarMass: 'Molar Mass (g/mol)',
+        gamma: 'Adiabatic Index γ',
+        refPressureSettings: 'REF PRESSURE',
+        refPressure: 'Ref Pressure',
+        kPa: 'kPa',
+        bar: 'bar',
+        psi: 'psi',
+        atm: 'atm',
+        mmHg: 'mmHg',
+        Pa: 'Pa',
+        MPa: 'MPa',
+        mmH2O: 'mmH₂O',
+        inH2O: 'inH₂O',
+        pressureParams: 'PRESSURE',
+        inletPressure: 'Inlet Pressure (g)',
+        outletPressure: 'Outlet Pressure (g)',
+        absolutePressure: 'Abs: ',
+        tempAndFlow: 'TEMP & FLOW',
+        inletTemp: 'Inlet Temp',
+        celsius: '°C',
+        kelvin: 'K',
+        fahrenheit: '°F',
+        flowType: 'Flow Type',
+        massFlow: 'Mass Flow',
+        volumeFlow: 'Volume Flow',
+        massFlowLabel: 'Mass Flow',
+        kg_s: 'kg/s',
+        kg_min: 'kg/min',
+        kg_h: 'kg/h',
+        g_s: 'g/s',
+        lb_s: 'lb/s',
+        volumeFlowLabel: 'Volume Flow',
+        m3_s: 'm³/s',
+        m3_min: 'm³/min',
+        m3_h: 'm³/h',
+        L_s: 'L/s',
+        L_min: 'L/min',
+        cfm: 'CFM',
+        volumeFlowTypeLabel: 'Volume Base',
+        standard20: 'Std 20°C',
+        standard0: 'Std 0°C',
+        actual: 'Actual Inlet',
+        gasDensity: 'GAS DENSITY',
+        stdDensity20: 'Std 20°C',
+        stdDensity0: 'Std 0°C',
+        actualInletDensity: 'Actual Inlet',
+        otherParams: 'OTHER PARAMS',
+        adiabaticEfficiency: 'Efficiency',
+        calculationResults: 'CALCULATION',
+        adiabaticPower: 'ADIABATIC POWER',
+        shaftPower: 'SHAFT POWER',
+        otherResults: 'OTHER RESULTS',
+        outletTemp: 'Outlet Temp',
+        convertedMassFlow: 'Mass Flow (Eq)',
+        actualInletFlow: 'Act Inlet Flow',
+        actualOutletFlow: 'Act Outlet Flow',
+        installToDesktop: 'Install App',
+        installPrompt: 'Add this app to home screen for quick access!',
+        later: 'Later',
+        install: 'Install'
+      }
+    };
+
+    let currentLanguage = 'zh';
+
+    const COMMON_GASES = {
+      air: { name: '空气', molarMass: 28.964, gamma: 1.4 },
+      nitrogen: { name: '氮气 (N₂)', molarMass: 28.013, gamma: 1.4 },
+      oxygen: { name: '氧气 (O₂)', molarMass: 31.999, gamma: 1.4 },
+      carbonDioxide: { name: '二氧化碳 (CO₂)', molarMass: 44.010, gamma: 1.3 },
+      hydrogen: { name: '氢气 (H₂)', molarMass: 2.016, gamma: 1.41 },
+      helium: { name: '氦气 (He)', molarMass: 4.003, gamma: 1.66 },
+      argon: { name: '氩气 (Ar)', molarMass: 39.948, gamma: 1.67 },
+      methane: { name: '甲烷 (CH₄)', molarMass: 16.043, gamma: 1.31 },
+    };
+
+    const PRESSURE_UNITS = {
+      kPa: { toKPa: v => v, fromKPa: v => v },
+      MPa: { toKPa: v => v * 1000, fromKPa: v => v / 1000 },
+      bar: { toKPa: v => v * 100, fromKPa: v => v / 100 },
+      psi: { toKPa: v => v * 6.89476, fromKPa: v => v / 6.89476 },
+      atm: { toKPa: v => v * 101.325, fromKPa: v => v / 101.325 },
+      Pa: { toKPa: v => v / 1000, fromKPa: v => v * 1000 },
+      mmH2O: { toKPa: v => v * 0.00980665, fromKPa: v => v / 0.00980665 },
+      inH2O: { toKPa: v => v * 0.2490889, fromKPa: v => v / 0.2490889 },
+    };
+
+    const MASS_FLOW_UNITS = {
+      kg_s: { toKgS: v => v, fromKgS: v => v },
+      kg_min: { toKgS: v => v / 60, fromKgS: v => v * 60 },
+      kg_h: { toKgS: v => v / 3600, fromKgS: v => v * 3600 },
+      g_s: { toKgS: v => v * 0.001, fromKgS: v => v * 1000 },
+      lb_s: { toKgS: v => v * 0.453592, fromKgS: v => v / 0.453592 },
+    };
+
+    const VOLUME_FLOW_UNITS = {
+      m3_s: { toM3S: v => v, fromM3S: v => v },
+      m3_min: { toM3S: v => v / 60, fromM3S: v => v * 60 },
+      m3_h: { toM3S: v => v / 3600, fromM3S: v => v * 3600 },
+      L_s: { toM3S: v => v * 0.001, fromM3S: v => v * 1000 },
+      L_min: { toM3S: v => v * 0.001 / 60, fromM3S: v => v * 60000 },
+      cfm: { toM3S: v => v * 0.000471947, fromM3S: v => v / 0.000471947 },
+    };
+
+    const POWER_UNITS = {
+      kW: { toKW: v => v, fromKW: v => v },
+      W: { toKW: v => v * 0.001, fromKW: v => v * 1000 },
+      MW: { toKW: v => v * 1000, fromKW: v => v / 1000 },
+      hp: { toKW: v => v * 0.7457, fromKW: v => v / 0.7457 },
+      PS: { toKW: v => v * 0.7355, fromKW: v => v / 0.7355 },
+    };
+
+    const TEMPERATURE_UNITS = {
+      C: { toK: v => v + 273.15, fromK: v => v - 273.15 },
+      K: { toK: v => v, fromK: v => v },
+      F: { toK: v => (v - 32) * 5 / 9 + 273.15, fromK: v => (v - 273.15) * 9 / 5 + 32 },
+    };
+
+    const DENSITY_UNITS = {
+      kg_m3: { toKgM3: v => v, fromKgM3: v => v },
+      g_L: { toKgM3: v => v, fromKgM3: v => v },
+      g_cm3: { toKgM3: v => v * 1000, fromKgM3: v => v / 1000 },
+      lb_ft3: { toKgM3: v => v * 16.0185, fromKgM3: v => v / 16.0185 },
+      lb_gal: { toKgM3: v => v * 119.826, fromKgM3: v => v / 119.826 },
+    };
+
+    let currentState = {
+      flowType: 'mass',
+      volumeFlowType: 'standard20'
+    };
+
+    function getElement(id) { return document.getElementById(id); }
+
+    function formatSignificantDigits(value, maxDigits = 6) {
+      if (value === null || value === undefined || isNaN(value)) return '0.00';
+      if (value === 0) return '0.00';
+      const absValue = Math.abs(value);
+      if (absValue >= 1e6 || absValue < 1e-3) {
+        return value.toPrecision(maxDigits);
+      } else {
+        return parseFloat(value.toPrecision(maxDigits)).toString();
+      }
+    }
+
+    function calculateStandardDensity(molarMass, stdTempType) {
+      const stdPressure = 101.325;
+      const stdTemp = stdTempType === '20' ? 293.15 : 273.15;
+      const R = 8.314 / (molarMass / 1000);
+      return (stdPressure * 1000) / (R * stdTemp);
+    }
+
+    function calculateActualDensity(molarMass, pressureKPa, tempK) {
+      const R = 8.314 / (molarMass / 1000);
+      return (pressureKPa * 1000) / (R * tempK);
+    }
+
+    function getFormConditions() {
+      const refPressure = parseFloat(getElement('refPressure').value) || 0;
+      const refPUnit = getElement('refPressureUnit').value;
+      const molarMass = parseFloat(getElement('molarMass').value) || 28.964;
+      const inletP_gauge = parseFloat(getElement('inletPressure').value) || 0;
+      const inletPUnit = getElement('pressureUnit').value;
+      const inletTemp = parseFloat(getElement('inletTemp').value) || 0;
+      const tempUnit = getElement('tempUnit').value;
+
+      const refPressure_kPa = PRESSURE_UNITS[refPUnit].toKPa(refPressure);
+      const inletP_gauge_kPa = PRESSURE_UNITS[inletPUnit].toKPa(inletP_gauge);
+      const p1_kPa = refPressure_kPa + inletP_gauge_kPa;
+      const T1_K = TEMPERATURE_UNITS[tempUnit].toK(inletTemp);
+
+      return { molarMass, p1_kPa, T1_K };
+    }
+
+    function calculate() {
+      try {
+        const gasKey = getElement('gasSelect').value;
+        const conds = getFormConditions();
+        const p1_kPa = conds.p1_kPa;
+        const T1_K = conds.T1_K;
+        const molarMass = conds.molarMass;
+
+        const gamma = parseFloat(getElement('adiabaticIndex').value) || 1.4;
+
+        const outletP_gauge = parseFloat(getElement('outletPressure').value) || 0;
+        const outletPUnit = getElement('outletPressureUnit').value;
+        const refPressure_kPa = conds.p1_kPa - PRESSURE_UNITS[getElement('pressureUnit').value].toKPa(parseFloat(getElement('inletPressure').value) || 0);
+        const p2_kPa = refPressure_kPa + PRESSURE_UNITS[outletPUnit].toKPa(outletP_gauge);
+
+        const flowType = getElement('flowType').value;
+
+        let massFlow_kg_s = 1;
+        let volumeFlow_m3_s = 1;
+
+        if (flowType === 'mass') {
+          const val = parseFloat(getElement('massFlow').value) || 0;
+          const unit = getElement('massFlowUnit').value;
+          massFlow_kg_s = MASS_FLOW_UNITS[unit].toKgS(val);
+          getElement('massFlowGroup').style.display = 'block';
+          getElement('volumeFlowGroup').style.display = 'none';
+          getElement('massFlowResult').style.display = 'none';
+        } else {
+          const val = parseFloat(getElement('volumeFlow').value) || 0;
+          const unit = getElement('volumeFlowUnit').value;
+          const volType = getElement('volumeFlowType').value;
+          volumeFlow_m3_s = VOLUME_FLOW_UNITS[unit].toM3S(val);
+
+          let densityForFlow = 1.2;
+          if (volType === 'actual') {
+            densityForFlow = calculateActualDensity(molarMass, p1_kPa, T1_K);
+          } else {
+            densityForFlow = calculateStandardDensity(molarMass, volType === 'standard20' ? '20' : '0');
+          }
+          massFlow_kg_s = volumeFlow_m3_s * densityForFlow;
+
+          getElement('massFlowGroup').style.display = 'none';
+          getElement('volumeFlowGroup').style.display = 'block';
+          getElement('massFlowResult').style.display = 'flex';
+          getElement('massFlowResultValue').textContent = formatSignificantDigits(massFlow_kg_s) + ' kg/s';
+        }
+
+        const stdDensity20 = calculateStandardDensity(molarMass, '20');
+        const stdDensity0 = calculateStandardDensity(molarMass, '0');
+        const actualDensityInlet = calculateActualDensity(molarMass, p1_kPa, T1_K);
+
+        const eff = (parseFloat(getElement('efficiency').value) || 80) / 100;
+
+        let W_ad_kW = 0;
+        let W_shaft_kW = 0;
+        let T2_K = T1_K;
+
+        if (p1_kPa > 0 && p2_kPa > 0 && gamma > 1) {
+          const R = 8.314 / (molarMass / 1000);
+          const pr = p2_kPa / p1_kPa;
+          const exp = (gamma - 1) / gamma;
+
+          const W_ad_W = (massFlow_kg_s * R * T1_K / exp) * (Math.pow(pr, exp) - 1);
+          W_ad_kW = W_ad_W / 1000;
+
+          if (eff > 0) {
+            W_shaft_kW = W_ad_kW / eff;
+          }
+
+          const T2s = T1_K * Math.pow(pr, exp);
+          T2_K = T1_K + (T2s - T1_K) / eff;
+        }
+
+        const actualDensityOutlet = calculateActualDensity(molarMass, p2_kPa, T2_K);
+        const actualVolFlowInlet_m3_h = actualDensityInlet > 0 ? (massFlow_kg_s / actualDensityInlet) * 3600 : 0;
+        const actualVolFlowOutlet_m3_h = actualDensityOutlet > 0 ? (massFlow_kg_s / actualDensityOutlet) * 3600 : 0;
+
+        const u_d20 = getElement('densityUnit20'); if (u_d20) getElement('density20').textContent = formatSignificantDigits(DENSITY_UNITS[u_d20.value].fromKgM3(stdDensity20));
+        const u_d0 = getElement('densityUnit0'); if (u_d0) getElement('density0').textContent = formatSignificantDigits(DENSITY_UNITS[u_d0.value].fromKgM3(stdDensity0));
+        const u_da = getElement('densityUnitActual'); if (u_da) getElement('densityActual').textContent = formatSignificantDigits(DENSITY_UNITS[u_da.value].fromKgM3(actualDensityInlet));
+
+        const u_pad = getElement('powerUnit'); if (u_pad) getElement('adiabaticPower').textContent = formatSignificantDigits(POWER_UNITS[u_pad.value].fromKW(W_ad_kW));
+        const u_psh = getElement('shaftPowerUnit'); if (u_psh) getElement('shaftPower').textContent = formatSignificantDigits(POWER_UNITS[u_psh.value].fromKW(W_shaft_kW));
+
+        const tempUnitSel = getElement('tempUnit');
+        if (tempUnitSel) {
+          const tu = tempUnitSel.value;
+          try {
+            const elOut = getElement('outletTemp');
+            if (elOut) elOut.textContent = formatSignificantDigits(TEMPERATURE_UNITS[tu].fromK(T2_K));
+
+            const elOutLabel = getElement('outletTempUnitLabel');
+            if (elOutLabel) {
+              let suffix = ' °C';
+              if (tu === 'K') suffix = ' K';
+              if (tu === 'F') suffix = ' °F';
+              elOutLabel.textContent = suffix;
+            }
+          } catch (e) { console.error("Temp update err:", e) }
+        }
+
+        const elActInlet = getElement('actualInletFlow');
+        if (elActInlet) elActInlet.textContent = formatSignificantDigits(actualVolFlowInlet_m3_h) + ' m³/h';
+
+        const elActOutlet = getElement('actualOutletFlow');
+        if (elActOutlet) elActOutlet.textContent = formatSignificantDigits(actualVolFlowOutlet_m3_h) + ' m³/h';
+
+        const prefixObj = currentLanguage === 'zh' ? '绝对压力：' : 'Abs: ';
+        const elInAbs = getElement('inletAbs'); if (elInAbs) elInAbs.textContent = prefixObj + formatSignificantDigits(p1_kPa) + ' kPa';
+        const elOutAbs = getElement('outletAbs'); if (elOutAbs) elOutAbs.textContent = prefixObj + formatSignificantDigits(p2_kPa) + ' kPa';
+
+        saveState();
+      } catch (err) {
+        console.error("Calculate Error: ", err);
+      }
+    }
+
+    function updateUI() {
+      const elements = document.querySelectorAll('[data-i18n]');
+      elements.forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (TRANSLATIONS[currentLanguage] && TRANSLATIONS[currentLanguage][key]) {
+          let hasElementChildren = Array.from(el.childNodes).some(n => n.nodeType === 1);
+          if (hasElementChildren) {
+            el.textContent = TRANSLATIONS[currentLanguage][key];
+          } else {
+            el.textContent = TRANSLATIONS[currentLanguage][key];
+          }
+        }
+      });
+      document.documentElement.lang = currentLanguage === 'zh' ? 'zh-CN' : 'en';
+
+      const zhBtn = getElement('lang-zh'); if (zhBtn) zhBtn.classList.toggle('active', currentLanguage === 'zh');
+      const enBtn = getElement('lang-en'); if (enBtn) enBtn.classList.toggle('active', currentLanguage === 'en');
+
+      calculate();
+    }
+
+    function switchLanguage(lang) {
+      if (document.documentElement.lang === (lang === 'zh' ? 'zh-CN' : 'en')) return;
+      currentLanguage = lang;
+      localStorage.setItem('gas-calculator-language', lang);
+      updateUI();
+    }
+
+    function handleGasChange() {
+      const gasKey = getElement('gasSelect').value;
+      if (gasKey !== 'custom' && COMMON_GASES[gasKey]) {
+        const gas = COMMON_GASES[gasKey];
+        getElement('molarMass').value = gas.molarMass;
+        getElement('adiabaticIndex').value = gas.gamma;
+      }
+      calculate();
+    }
+
+    function handleFlowTypeSwitch() {
+      const newFlowType = getElement('flowType').value;
+      if (currentState.flowType === newFlowType) return;
+
+      const conds = getFormConditions();
+      const volType = getElement('volumeFlowType').value;
+
+      let densityForFlow = 1.2;
+      if (volType === 'actual') {
+        densityForFlow = calculateActualDensity(conds.molarMass, conds.p1_kPa, conds.T1_K);
+      } else {
+        densityForFlow = calculateStandardDensity(conds.molarMass, volType === 'standard20' ? '20' : '0');
+      }
+
+      if (newFlowType === 'mass') {
+        const curVol = parseFloat(getElement('volumeFlow').value) || 0;
+        const u_v = getElement('volumeFlowUnit').value;
+        const m3s = VOLUME_FLOW_UNITS[u_v].toM3S(curVol);
+        const kg_s = m3s * densityForFlow;
+
+        const u_m = getElement('massFlowUnit').value;
+        const newMass = MASS_FLOW_UNITS[u_m].fromKgS(kg_s);
+        getElement('massFlow').value = parseFloat(newMass.toPrecision(6));
+      } else {
+        const curMass = parseFloat(getElement('massFlow').value) || 0;
+        const u_m = getElement('massFlowUnit').value;
+        const kg_s = MASS_FLOW_UNITS[u_m].toKgS(curMass);
+        const m3s = kg_s / densityForFlow;
+
+        const u_v = getElement('volumeFlowUnit').value;
+        const newVol = VOLUME_FLOW_UNITS[u_v].fromM3S(m3s);
+        getElement('volumeFlow').value = parseFloat(newVol.toPrecision(6));
+      }
+
+      currentState.flowType = newFlowType;
+      calculate();
+    }
+
+    function handleVolumeFlowTypeSwitch() {
+      const newVolType = getElement('volumeFlowType').value;
+      if (currentState.volumeFlowType === newVolType) return;
+
+      if (currentState.flowType === 'volume') {
+        const conds = getFormConditions();
+        const curVol = parseFloat(getElement('volumeFlow').value) || 0;
+        const u_v = getElement('volumeFlowUnit').value;
+        const m3s_old = VOLUME_FLOW_UNITS[u_v].toM3S(curVol);
+
+        let oldDensity = 1.2;
+        if (currentState.volumeFlowType === 'actual') {
+          oldDensity = calculateActualDensity(conds.molarMass, conds.p1_kPa, conds.T1_K);
+        } else {
+          oldDensity = calculateStandardDensity(conds.molarMass, currentState.volumeFlowType === 'standard20' ? '20' : '0');
+        }
+        const mass_kg_s = m3s_old * oldDensity;
+
+        let newDensity = 1.2;
+        if (newVolType === 'actual') {
+          newDensity = calculateActualDensity(conds.molarMass, conds.p1_kPa, conds.T1_K);
+        } else {
+          newDensity = calculateStandardDensity(conds.molarMass, newVolType === 'standard20' ? '20' : '0');
+        }
+        const m3s_new = mass_kg_s / newDensity;
+        const newVol = VOLUME_FLOW_UNITS[u_v].fromM3S(m3s_new);
+        getElement('volumeFlow').value = parseFloat(newVol.toPrecision(6));
+      }
+
+      currentState.volumeFlowType = newVolType;
+      calculate();
+    }
+
+    function makeLinkedUnitConverters(groupData, unitDict, toBaseMethod, fromBaseMethod) {
+      groupData.forEach(item => {
+        const sEl = getElement(item.select);
+        if (sEl) sEl.dataset.oldUnit = sEl.value;
+      });
+
+      groupData.forEach(currentItem => {
+        const sEl = getElement(currentItem.select);
+        if (!sEl) return;
+        sEl.addEventListener('change', (e) => {
+          const newUnit = sEl.value;
+
+          groupData.forEach(targetItem => {
+            const targetSel = getElement(targetItem.select);
+            if (!targetSel) return;
+
+            const curOldUnit = targetSel.dataset.oldUnit || targetSel.value;
+            if (curOldUnit !== newUnit) {
+              if (targetItem.input) {
+                const iEl = getElement(targetItem.input);
+                if (iEl) {
+                  const val = parseFloat(iEl.value);
+                  if (!isNaN(val) && unitDict[curOldUnit] && unitDict[newUnit]) {
+                    const baseVal = unitDict[curOldUnit][toBaseMethod](val);
+                    const newVal = unitDict[newUnit][fromBaseMethod](baseVal);
+                    iEl.value = parseFloat(newVal.toPrecision(6));
+                  }
+                }
+              }
+              targetSel.value = newUnit;
+              targetSel.dataset.oldUnit = newUnit;
+            }
+          });
+
+          sEl.dataset.oldUnit = newUnit;
+          calculate();
+        });
+      });
+    }
+
+
+    const PERSISTENT_ELEMENTS = [
+      'gasSelect', 'molarMass', 'adiabaticIndex',
+      'refPressure', 'refPressureUnit',
+      'inletPressure', 'pressureUnit',
+      'outletPressure', 'outletPressureUnit',
+      'inletTemp', 'tempUnit',
+      'flowType', 'massFlow', 'massFlowUnit',
+      'volumeFlow', 'volumeFlowType', 'volumeFlowUnit',
+      'efficiency',
+      'densityUnit20', 'densityUnit0', 'densityUnitActual',
+      'powerUnit', 'shaftPowerUnit'
+    ];
+
+    function saveState() {
+      const state = {};
+      PERSISTENT_ELEMENTS.forEach(id => {
+        const el = getElement(id);
+        if (el) state[id] = el.value;
+      });
+      localStorage.setItem('gas-calculator-state', JSON.stringify(state));
+    }
+
+    function loadState() {
+      const saved = localStorage.getItem('gas-calculator-state');
+      if (saved) {
+        try {
+          const state = JSON.parse(saved);
+          PERSISTENT_ELEMENTS.forEach(id => {
+            if (state[id] !== undefined) {
+              const el = getElement(id);
+              if (el) {
+                el.value = state[id];
+                if (el.tagName === 'SELECT') {
+                  el.dataset.oldUnit = state[id];
+                }
+              }
+            }
+          });
+          if (state.flowType) {
+            currentState.flowType = state.flowType;
+          }
+          if (state.volumeFlowType) {
+            currentState.volumeFlowType = state.volumeFlowType;
+          }
+        } catch (e) { console.error('Load state error:', e); }
+      }
+    }
+
+    function init() {
+      const savedLang = localStorage.getItem('gas-calculator-language');
+      currentLanguage = savedLang || (navigator.language.startsWith('zh') ? 'zh' : 'en');
+
+      const zhBtn = getElement('lang-zh');
+      if (zhBtn) zhBtn.addEventListener('click', () => switchLanguage('zh'));
+      const enBtn = getElement('lang-en');
+      if (enBtn) enBtn.addEventListener('click', () => switchLanguage('en'));
+
+      const flowTypeSel = getElement('flowType');
+      if (flowTypeSel) {
+        currentState.flowType = flowTypeSel.value;
+        flowTypeSel.addEventListener('change', handleFlowTypeSwitch);
+      }
+      const volumeFlowTypeSel = getElement('volumeFlowType');
+      if (volumeFlowTypeSel) {
+        currentState.volumeFlowType = volumeFlowTypeSel.value;
+        volumeFlowTypeSel.addEventListener('change', handleVolumeFlowTypeSwitch);
+      }
+
+      const inputs = document.querySelectorAll('input:not(#refPressure):not(#inletPressure):not(#outletPressure):not(#inletTemp):not(#massFlow):not(#volumeFlow), select:not([id$="Unit"]):not(#flowType):not(#volumeFlowType):not(#gasSelect)');
+      inputs.forEach(input => {
+        input.addEventListener('input', calculate);
+        input.addEventListener('change', calculate);
+      });
+      const numericInputsToCalc = ['refPressure', 'inletPressure', 'outletPressure', 'inletTemp', 'massFlow', 'volumeFlow'];
+      numericInputsToCalc.forEach(id => {
+        const el = getElement(id);
+        if (el) {
+          el.addEventListener('input', calculate);
+          el.addEventListener('change', calculate);
+        }
+      });
+
+      const gasSel = getElement('gasSelect');
+      if (gasSel) {
+        gasSel.removeEventListener('change', calculate);
+        gasSel.addEventListener('change', handleGasChange);
+      }
+
+      const pressureGroup = [
+        { input: 'refPressure', select: 'refPressureUnit' },
+        { input: 'inletPressure', select: 'pressureUnit' },
+        { input: 'outletPressure', select: 'outletPressureUnit' }
+      ];
+      makeLinkedUnitConverters(pressureGroup, PRESSURE_UNITS, 'toKPa', 'fromKPa');
+
+      const tempGroup = [
+        { input: 'inletTemp', select: 'tempUnit' }
+      ];
+      makeLinkedUnitConverters(tempGroup, TEMPERATURE_UNITS, 'toK', 'fromK');
+
+      const massFlowGroup = [
+        { input: 'massFlow', select: 'massFlowUnit' }
+      ];
+      makeLinkedUnitConverters(massFlowGroup, MASS_FLOW_UNITS, 'toKgS', 'fromKgS');
+
+      const volFlowGroup = [
+        { input: 'volumeFlow', select: 'volumeFlowUnit' }
+      ];
+      makeLinkedUnitConverters(volFlowGroup, VOLUME_FLOW_UNITS, 'toM3S', 'fromM3S');
+
+      const densityGroup = [
+        { input: null, select: 'densityUnit20' },
+        { input: null, select: 'densityUnit0' },
+        { input: null, select: 'densityUnitActual' }
+      ];
+      makeLinkedUnitConverters(densityGroup, DENSITY_UNITS, 'toKgM3', 'fromKgM3');
+
+      const powerGroup = [
+        { input: null, select: 'powerUnit' },
+        { input: null, select: 'shaftPowerUnit' }
+      ];
+      makeLinkedUnitConverters(powerGroup, POWER_UNITS, 'toKW', 'fromKW');
+
+      loadState();
+      updateUI();
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+
+</html>
