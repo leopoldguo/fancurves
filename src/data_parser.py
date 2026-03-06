@@ -291,9 +291,16 @@ def filter_operating_points(
         new_rows.extend(refined)
 
     result_df = pd.DataFrame(new_rows)
-    surge_line_df = pd.DataFrame({
-        flow_col: [surge_df.iloc[0][flow_col], surge_df.iloc[-1][flow_col]],
-        pressure_col: [surge_df.iloc[0][pressure_col], surge_df.iloc[-1][pressure_col]]
-    }) if m_surge is not None else pd.DataFrame()
+    # 直接用拟合方程 Q = m_surge * P + b_surge 在压力范围两端求值，
+    # 确保视觉喘振线与实际裁剪边界完全一致（避免锚点坐标与拟合线不对齐）
+    if m_surge is not None:
+        p_lo = float(surge_df[pressure_col].min())
+        p_hi = float(surge_df[pressure_col].max())
+        surge_line_df = pd.DataFrame({
+            pressure_col: [p_lo, p_hi],
+            flow_col:     [m_surge * p_lo + b_surge, m_surge * p_hi + b_surge]
+        })
+    else:
+        surge_line_df = pd.DataFrame()
 
     return result_df, surge_line_df, peak_info
