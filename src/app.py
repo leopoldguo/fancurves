@@ -88,10 +88,19 @@ section[data-testid="stSidebar"] details {
     background: rgba(0,0,0,0.15) !important;
     border-radius: 6px !important;
 }
-/* 隐藏 Logo 悬停时的缩放按鈕 */
+/* 隐藏所有 Streamlit 悬停/缩放/键盘快捷键浮层 */
 [data-testid="stImage"] button,
-[data-testid="stImage"] [data-testid="StyledFullScreenButton"] {
+[data-testid="StyledFullScreenButton"],
+[data-testid="stSidebarCollapseButton"],
+[data-testid="collapsedControl"],
+button[kind="headerNoPadding"],
+section[data-testid="stSidebar"] [data-testid="stTooltipHoverTarget"],
+.st-emotion-cache-czk5ss,
+div[class*="sidebarIcon"],
+div[class*="keyboardShortcut"] {
     display: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
 }
 
 /* ── File Uploader ── */
