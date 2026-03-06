@@ -23,11 +23,19 @@ st.markdown("""
 <style>
 /* 修复侧边栏带有 logo 时的超大间隔和不对齐问题 */
 [data-testid="stSidebarNav"] {
-    margin-top: -3rem !important;
+    /* 取消导致重叠的巨大负边距，恢复正常但偏小的间距 */
+    margin-top: 1rem !important;
 }
 [data-testid="stLogo"] {
+    /* 将 Logo 整体下移一点并与左侧文字对齐 */
     margin-top: 1rem !important;
-    margin-left: -0.5rem !important;
+    margin-left: 1.2rem !important;
+    margin-bottom: 0.5rem !important;
+}
+[data-testid="stLogo"] img {
+    /* 强制限制 Logo 的最大高度，防止其过大 */
+    max-height: 40px !important;
+    width: auto !important;
 }
 </style>
 """, unsafe_allow_html=True)
