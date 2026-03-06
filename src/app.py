@@ -48,13 +48,24 @@ section[data-testid="stSidebar"] * {
 }
 
 /* ── Sidebar: Input Controls ── */
-section[data-testid="stSidebar"] input,
-section[data-testid="stSidebar"] div[data-baseweb="select"] > div {
-    background-color: rgba(0,0,0,0.25) !important;
-    border: 1px solid rgba(255,255,255,0.25) !important;
+section[data-testid="stSidebar"] input {
+    background-color: rgba(255,255,255,0.12) !important;
+    border: 1px solid rgba(255,255,255,0.30) !important;
     border-radius: 4px !important;
     color: var(--white) !important;
     font-family: var(--mono) !important;
+}
+section[data-testid="stSidebar"] div[data-baseweb="input"],
+section[data-testid="stSidebar"] div[data-baseweb="base-input"] {
+    background-color: rgba(255,255,255,0.12) !important;
+    border: 1px solid rgba(255,255,255,0.30) !important;
+    border-radius: 4px !important;
+}
+section[data-testid="stSidebar"] div[data-baseweb="select"] > div {
+    background-color: rgba(255,255,255,0.12) !important;
+    border: 1px solid rgba(255,255,255,0.30) !important;
+    border-radius: 4px !important;
+    color: var(--white) !important;
 }
 section[data-testid="stSidebar"] input:focus {
     border-color: var(--blue-accent) !important;
@@ -69,7 +80,11 @@ section[data-testid="stSidebar"] hr {
 section[data-testid="stSidebar"] details {
     background: rgba(0,0,0,0.15) !important;
     border-radius: 6px !important;
-    padding: 4px 8px !important;
+}
+/* 隐藏 Logo 悬停时的缩放按鈕 */
+[data-testid="stImage"] button,
+[data-testid="stImage"] [data-testid="StyledFullScreenButton"] {
+    display: none !important;
 }
 
 /* ── File Uploader ── */
@@ -148,9 +163,16 @@ with col_logo2:
             break
             
     if logo_to_show:
-        st.image(logo_to_show, use_container_width=True)
+        import base64
+        with open(logo_to_show, "rb") as f:
+            logo_b64 = base64.b64encode(f.read()).decode()
+        ext = os.path.splitext(logo_to_show)[1].lower().replace(".", "")
+        mime = "jpeg" if ext in ("jpg", "jpeg") else ext
+        st.markdown(
+            f'<img src="data:image/{mime};base64,{logo_b64}" style="width:100%;display:block;">',
+            unsafe_allow_html=True
+        )
     else:
-        # 如果还是找不到，仅显示一个占位或跳过，避免报错崩溃
         pass
 
 st.markdown("<h1 style='text-align: center; margin-top: -20px;'>风机性能曲线数据看板</h1>", unsafe_allow_html=True)
