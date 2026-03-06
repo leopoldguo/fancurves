@@ -59,12 +59,6 @@ st.markdown("""
 header {background: transparent !important;}
 footer {visibility: hidden;}
 
-/* 禁止用户收起侧边栏：仅隐藏处于展开状态侧边栏内的收起按钮，防止误伤外层的展开按钮 */
-[data-testid="stSidebar"][aria-expanded="true"] [data-testid="stSidebarCollapseButton"],
-[data-testid="stSidebar"][aria-expanded="true"] [data-testid="baseButton-headerNoPadding"] {
-    display: none !important;
-}
-
 .block-container {
     padding-top: 1rem !important;
     padding-bottom: 0rem !important;

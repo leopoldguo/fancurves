@@ -35,11 +35,6 @@ st.markdown("""
 header {background: transparent !important;}
 footer {visibility: hidden;}
 
-/* 禁止用户收起侧边栏：隐藏收起按钮 */
-[data-testid="stSidebarCollapseButton"] {
-    display: none !important;
-}
-
 /* 减小顶部留白 */
 .block-container {
     padding-top: 1rem !important;
