@@ -45,9 +45,13 @@ footer {visibility: hidden;}
 }
 
 /* ── Global ── */
-html, body, [class*="css"] {
+html, body, [class*="css"]:not(.material-symbols-rounded) {
     font-family: var(--sans) !important;
     background-color: var(--bg-main) !important;
+}
+/* 强制恢复所有的 Material Icons 字体以防乱码 */
+.material-symbols-rounded {
+    font-family: 'Material Symbols Rounded' !important;
 }
 /* 主内容区域背景 + 页眉 */
 [data-testid="stAppViewContainer"],

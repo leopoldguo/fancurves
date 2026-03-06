@@ -44,7 +44,7 @@ st.markdown(
             display: block;
             width: 85%;
             height: 65px; /* 按照 4.3 的宽高比计算出合理且较大的高度 */
-            margin-left: 1.5rem;
+            margin-left: 0;
             margin-top: 1rem;
             margin-bottom: 2rem;
             background-image: url("data:image/png;base64,{logo_base64}");
