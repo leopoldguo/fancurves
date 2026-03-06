@@ -199,14 +199,20 @@ if _header_logo_b64:
 else:
     _logo_html = ""
 
-st.markdown(f"""
-<div style="text-align:center; padding: 16px 0 8px 0;">
-    {_logo_html}
-    <h1 style="margin:8px 0 0 0; font-size:1.6rem; color:#F5F7FA; font-family:IBM Plex Sans,sans-serif; font-weight:600; letter-spacing:-0.01em;">
-        风机性能曲线数据看板
-    </h1>
-</div>
-""", unsafe_allow_html=True)
+# Logo 居中
+if _logo_html:
+    st.markdown(
+        f'<div style="text-align:center; padding: 16px 0 4px 0;">{_logo_html}</div>',
+        unsafe_allow_html=True
+    )
+
+# 标题居中（独立渲染，不受 base64 大小影响）
+st.markdown(
+    "<h1 style='text-align:center; margin:4px 0 8px 0; font-size:1.6rem; color:#F5F7FA;"
+    " font-family:IBM Plex Sans,sans-serif; font-weight:600; letter-spacing:-0.01em;'>"
+    "风机性能曲线数据看板</h1>",
+    unsafe_allow_html=True
+)
 
 PREFS_FILE = "user_prefs.json"
 
