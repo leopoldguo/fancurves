@@ -118,11 +118,7 @@ h2, h3 {
     letter-spacing: 0.02em !important;
 }
 
-/* ── Container Cards ── */
-[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"] {
-    background: var(--bg-card) !important;
-    border-radius: 8px !important;
-}
+
 
 /* ── Radio Buttons in Sidebar ── */
 section[data-testid="stSidebar"] [data-testid="stRadio"] label {
