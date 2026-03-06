@@ -395,6 +395,26 @@ def create_performance_curve_export(fig_dark: go.Figure) -> go.Figure:
     # 更新 annotations（副标题文字颜色）
     for ann in fig.layout.annotations:
         ann.font.color = "#333333"
+
+    # 添加带 slogon 的 Logo (logo_compressor.png)
+    import os
+    import base64
+    logo_path = os.path.join(os.path.dirname(__file__), "assets", "logo_compressor.png")
+    if os.path.exists(logo_path):
+        with open(logo_path, "rb") as f:
+            b64_logo = base64.b64encode(f.read()).decode()
+        fig.add_layout_image(
+            dict(
+                source=f"data:image/png;base64,{b64_logo}",
+                xref="paper", yref="paper",
+                x=0, y=1.12,
+                sizex=0.25, sizey=0.25,
+                xanchor="left", yanchor="top",
+                opacity=1.0,
+                layer="above"
+            )
+        )
+
     return fig
 
 
