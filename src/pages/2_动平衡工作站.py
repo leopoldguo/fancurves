@@ -11,6 +11,24 @@ import streamlit.components.v1 as components
 
 _static = os.path.join(os.path.dirname(__file__), "..", "static")
 
+# --- 强制侧边栏展开并锁定 ---
+components.html(
+    """
+    <script>
+        const parent = window.parent.document;
+        const checkCollapsed = setInterval(() => {
+            const expandBtn = parent.querySelector('[data-testid="collapsedControl"]');
+            if (expandBtn) {
+                expandBtn.click();
+            }
+        }, 50);
+        setTimeout(() => clearInterval(checkCollapsed), 1000);
+    </script>
+    """,
+    height=0,
+    width=0,
+)
+
 def get_transparent_logo_b64(logo_path: str) -> str:
     """读取带有深色背景的 Logo，将其转换为带透明通道 (Alpha) 的纯白 Logo"""
     img = Image.open(logo_path).convert("RGB")
@@ -81,6 +99,12 @@ st.markdown("""
 [data-testid="stHeaderActionElements"] {visibility: hidden;}
 header {background: transparent !important;}
 footer {visibility: hidden;}
+
+/* 禁止用户收起侧边栏：隐藏收起按钮 */
+[data-testid="stSidebarCollapseButton"] {
+    display: none !important;
+}
+
 .block-container {
     padding-top: 1rem !important;
     padding-bottom: 0rem !important;
