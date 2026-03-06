@@ -20,12 +20,19 @@ logo_path = os.path.join(os.path.dirname(__file__), "assets", "logo_transparent.
 with open(logo_path, "rb") as f:
     logo_base64 = base64.b64encode(f.read()).decode()
 
-# 使用标准的 markdown 注入侧边栏顶部，绝对可控的排版布局，完美适配各种屏幕并不产生重叠
-st.sidebar.markdown(
+# 利用 CSS 的 background-image 霸道注入：直接把 Logo 印在侧边导航栏 (stSidebarNav) 的正上方
+# 因为 st.navigation 默认强制排在侧边栏最先，所以只能在上方的 padding 里画图，这是 100% 确保它在最顶部的终极方案！
+st.markdown(
     f"""
-    <div style="margin-top: 15px; margin-bottom: 25px; margin-left: 10px;">
-        <img src="data:image/png;base64,{logo_base64}" style="width: 85%; height: auto;">
-    </div>
+    <style>
+        [data-testid="stSidebarNav"] {{
+            padding-top: 110px !important;
+            background-image: url("data:image/png;base64,{logo_base64}");
+            background-repeat: no-repeat;
+            background-size: 80% auto;
+            background-position: 25px 30px;
+        }}
+    </style>
     """,
     unsafe_allow_html=True
 )
