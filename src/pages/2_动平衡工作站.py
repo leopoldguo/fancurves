@@ -72,6 +72,10 @@ st.markdown("""
 header {background: transparent !important;}
 footer {visibility: hidden;}
 
+[data-testid="stTooltipIcon"] {
+    display: none !important;
+}
+
 .block-container {
     padding-top: 1rem !important;
     padding-bottom: 0rem !important;

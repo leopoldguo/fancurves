@@ -108,6 +108,7 @@ section[data-testid="stSidebar"] details {
 [data-testid="stImage"] button,
 [data-testid="StyledFullScreenButton"],
 section[data-testid="stSidebar"] [data-testid="stTooltipHoverTarget"],
+[data-testid="stTooltipIcon"],
 div[class*="keyboardShortcut"] {
     display: none !important;
     opacity: 0 !important;
