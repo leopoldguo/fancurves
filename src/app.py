@@ -18,6 +18,20 @@ st.set_page_config(
 logo_path = os.path.join(os.path.dirname(__file__), "assets", "logo_transparent.png")
 st.logo(logo_path)
 
+# 全局侧边栏对齐样式修复
+st.markdown("""
+<style>
+/* 修复侧边栏带有 logo 时的超大间隔和不对齐问题 */
+[data-testid="stSidebarNav"] {
+    margin-top: -3rem !important;
+}
+[data-testid="stLogo"] {
+    margin-top: 1rem !important;
+    margin-left: -0.5rem !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 pg = st.navigation([
     st.Page("pages/home.py",         title="工具箱首页",   icon="🏠", default=True),
     st.Page("pages/1_风机性能曲线.py", title="风机性能曲线", icon="📈"),
