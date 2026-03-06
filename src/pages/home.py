@@ -8,7 +8,11 @@ st.markdown("""
 footer {visibility: hidden;}
 /* 减小顶部留白 */
 .block-container {
-    padding-top: 2rem !important;
+    padding-top: 1rem !important;
+}
+/* 减小标题自带的 margin */
+h1 {
+    margin-top: -1rem !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -39,19 +43,19 @@ with col2:
 
     with m1:
         st.markdown("### 📈 风机性能曲线")
-        st.markdown("专业的风机性能曲线图谱工具。支持从离线计算数据进行插值，生成包含各类工程边界的精美可导出图谱。")
+        st.markdown("<div style='min-height: 85px; color: #cbd5e1;'>专业的风机性能曲线图谱工具。支持从离线计算数据进行插值，生成包含各类工程边界的精美可导出图谱。</div>", unsafe_allow_html=True)
         if st.button("进入 → 风机性能曲线", use_container_width=True, key="btn_curve"):
             st.switch_page("pages/1_风机性能曲线.py")
 
     with m2:
         st.markdown("### ⚖️ 动平衡工作站")
-        st.markdown("基于 ISO 1940 标准的参数测算与判定系统。许用不平衡力矩评估及钻孔去重深度计算指导。")
+        st.markdown("<div style='min-height: 85px; color: #cbd5e1;'>基于 ISO 1940 标准的参数测算与判定系统。许用不平衡力矩评估及钻孔去重深度计算指导。</div>", unsafe_allow_html=True)
         if st.button("进入 → 动平衡工作站", use_container_width=True, key="btn_balance"):
             st.switch_page("pages/2_动平衡工作站.py")
 
     with m3:
         st.markdown("### 💨 气体计算器")
-        st.markdown("通用热力学气体参数转换引擎。绝热压缩功率计算及状态体积、质量流量物理换算。")
+        st.markdown("<div style='min-height: 85px; color: #cbd5e1;'>通用热力学气体参数转换引擎。绝热压缩功率计算及状态体积、质量流量物理换算。</div>", unsafe_allow_html=True)
         if st.button("进入 → 气体计算器", use_container_width=True, key="btn_gas"):
             st.switch_page("pages/3_气体计算器.py")
 
