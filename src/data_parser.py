@@ -291,15 +291,10 @@ def filter_operating_points(
         new_rows.extend(refined)
 
     result_df = pd.DataFrame(new_rows)
-    # 直接用拟合方程 Q = m_surge * P + b_surge 在压力范围两端求值，
-    # 确保视觉喘振线与实际裁剪边界完全一致（避免锚点坐标与拟合线不对齐）
-    if m_surge is not None:
-        p_lo = float(surge_df[pressure_col].min())
-        p_hi = float(surge_df[pressure_col].max())
-        surge_line_df = pd.DataFrame({
-            pressure_col: [p_lo, p_hi],
-            flow_col:     [m_surge * p_lo + b_surge, m_surge * p_hi + b_surge]
-        })
+    # 喘振线视觉：使用全部转速的锚点，保证线经过每条速度曲线的左侧边界
+    # 按压力从低到高排列，使绘图折线从低速→高速方向连接
+    if m_surge is not None and not surge_df.empty:
+        surge_line_df = surge_df[[flow_col, pressure_col]].sort_values(by=pressure_col).reset_index(drop=True)
     else:
         surge_line_df = pd.DataFrame()
 
