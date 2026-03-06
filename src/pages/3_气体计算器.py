@@ -7,12 +7,11 @@ try:
     HAS_PIL = True
 except ImportError:
     HAS_PIL = False
-import streamlit.components.v1 as components
 
 _static = os.path.join(os.path.dirname(__file__), "..", "static")
 
 # --- 强制侧边栏展开并锁定 ---
-components.html(
+st.components.v1.html(
     """
     <script>
         const checkCollapsed = setInterval(() => {

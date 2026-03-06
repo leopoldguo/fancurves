@@ -1,6 +1,5 @@
 import math
 import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
 from data_parser import (
     normalize_dataframe, convert_flow_units,
@@ -13,7 +12,7 @@ import json
 import os
 
 # --- 强制侧边栏展开并锁定 ---
-components.html(
+st.components.v1.html(
     """
     <script>
         const checkCollapsed = setInterval(() => {
