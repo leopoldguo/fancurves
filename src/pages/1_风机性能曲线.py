@@ -107,8 +107,6 @@ section[data-testid="stSidebar"] details {
 /* 隐藏所有 Streamlit 悬停/缩放/键盘快捷键浮层 */
 [data-testid="stImage"] button,
 [data-testid="StyledFullScreenButton"],
-[data-testid="stSidebarCollapseButton"],
-[data-testid="collapsedControl"],
 button[kind="headerNoPadding"],
 section[data-testid="stSidebar"] [data-testid="stTooltipHoverTarget"],
 .st-emotion-cache-czk5ss,
