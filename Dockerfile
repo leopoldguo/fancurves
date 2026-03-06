@@ -9,11 +9,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 # 安装系统依赖（如果有些包需要编译）
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    curl \
-    software-properties-common \
-    && rm -rf /var/lib/apt/lists/*
+# 删除了 apt-get 步骤，因为大多数 NAS 网络连外网 apt 源可能会报错，并且现在这些库都有预编译的 wheel，可以直接装
+
 
 # 复制 requirements 文件并安装依赖
 COPY requirements.txt .
