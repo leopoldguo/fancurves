@@ -5,6 +5,8 @@ import streamlit as st
 # 这是 Streamlit 1.36+ 推荐的多页面方案，兼容性更好
 # ============================================================
 
+import os
+
 st.set_page_config(
     page_title="IBI 工程师工具箱",
     page_icon="🔧",
@@ -12,8 +14,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 使用刚刚抠图去底处理好的透明 Logo
-st.logo("assets/logo_transparent.png")
+# 使用绝对路径定位刚刚抠图好的透明 Logo，避免部署云端时因执行目录变化引起的路径报错
+logo_path = os.path.join(os.path.dirname(__file__), "assets", "logo_transparent.png")
+st.logo(logo_path)
 
 pg = st.navigation([
     st.Page("pages/home.py",         title="工具箱首页",   icon="🏠", default=True),
