@@ -6,7 +6,7 @@ from data_parser import (
     filter_operating_points, convert_pressure_ratio_to_kpa,
     compute_efficiency
 )
-from plotter import create_performance_curve
+from plotter import create_performance_curve, create_performance_curve_export
 
 import json
 import os
@@ -458,10 +458,10 @@ if uploaded_file:
         final_df = filtered_df.copy()
         # ─── 绘图容器 ──────────────────────────────────────────────────────────────
         plot_container = st.container(border=True)
-        plot_container.subheader("📈 性能图谱区")
         if final_df.empty:
             plot_container.warning("当前流量范围内没有数据，请调整X轴显示范围。")
         else:
+            _chart_title = getattr(uploaded_file, "name", "") if uploaded_file else ""
             fig = create_performance_curve(
                 final_df, surge_line_df,
                 x_col="display_flow", y1_col="display_pressure", y2_col=power_col,
@@ -471,9 +471,25 @@ if uploaded_file:
                 show_power=show_power,
                 show_efficiency=show_efficiency,
                 eff_contour_step=eff_contour_step,
+                chart_title=_chart_title,
             )
             plot_container.plotly_chart(fig, use_container_width=True)
-            plot_container.info("💡 鼠标悬停在图表右上角 → 相机图标 → 下载高清 PNG")
+            
+            # 白底导出下载按鈕（国标顺时针：白底、图例在下）
+            try:
+                import plotly.io as pio
+                _fig_export = create_performance_curve_export(fig)
+                _png_bytes = pio.to_image(_fig_export, format="png", width=1200, height=750, scale=2)
+                _fname_stem = _chart_title.rsplit(".", 1)[0] if "." in _chart_title else _chart_title
+                _dl_name = f"{_fname_stem}_风机性能曲线图.png" if _fname_stem else "风机性能曲线图.png"
+                plot_container.download_button(
+                    label="⬇️ 下载白底高清 PNG（国标截图版：图例在下）",
+                    data=_png_bytes,
+                    file_name=_dl_name,
+                    mime="image/png"
+                )
+            except Exception as e:
+                plot_container.info("💡 鼠标悬停在图表右上角 → 相机图标 → 下载高清 PNG")
 
         # ─── 统计容器 ──────────────────────────────────────────────────────────────
             stat_container = st.container(border=True)

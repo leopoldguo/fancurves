@@ -249,6 +249,7 @@ def create_performance_curve(
     show_power: bool = True,
     show_efficiency: bool = False,
     eff_contour_step: float = 2.0,
+    chart_title: str = "",        # 文件名，作为图表副标题
 ) -> go.Figure:
 
     fig = make_subplots(specs=[[{"secondary_y": True}]])
@@ -328,14 +329,26 @@ def create_performance_curve(
             smooth_level=eff_smooth,
         )
 
+    # 文件名副标题 (annotation 放在图表顶部居中)
+    annotations = []
+    if chart_title:
+        annotations.append(dict(
+            text=chart_title,
+            x=0.5, y=1.10, xref="paper", yref="paper",
+            xanchor="center", yanchor="bottom",
+            font=dict(size=13, color="#A0B4D0", family="IBM Plex Sans, sans-serif"),
+            showarrow=False
+        ))
+
     fig.update_layout(
-        title_text="Fan Performance Map", title_font_size=18,
+        title=dict(text="风机性能曲线图", x=0.5, xanchor="center", font=dict(size=18, color="#F5F7FA")),
         plot_bgcolor="#131B2E", paper_bgcolor="#131B2E",
         hovermode="x unified",
         font=dict(family="IBM Plex Sans, sans-serif", size=13, color="#E8EDF5"),
         legend=dict(orientation="v", bordercolor="rgba(126,170,238,0.3)",
                     borderwidth=1, bgcolor="rgba(19,27,46,0.90)"),
-        margin=dict(l=80, r=80, t=80, b=60),
+        margin=dict(l=80, r=80, t=100, b=60),
+        annotations=annotations,
     )
     fig.update_xaxes(title_text=x_label,
                      showgrid=True, gridcolor='rgba(94,128,200,0.2)',
@@ -353,6 +366,36 @@ def create_performance_curve(
                      ticklen=6, tickcolor='rgba(94,128,200,0.5)' if show_power else "rgba(0,0,0,0)",
                      showticklabels=show_power)
     return fig
+
+
+def create_performance_curve_export(fig_dark: go.Figure) -> go.Figure:
+    """从暗色交互图表生成白底、底部图例的导出版本（用于国标截图）。"""
+    import copy
+    fig = copy.deepcopy(fig_dark)
+    fig.update_layout(
+        plot_bgcolor="#FFFFFF",
+        paper_bgcolor="#FFFFFF",
+        font=dict(color="#000000"),
+        title_font_color="#000000",
+        legend=dict(
+            orientation="h",
+            yanchor="top", y=-0.18,
+            xanchor="center", x=0.5,
+            bgcolor="rgba(255,255,255,0.9)",
+            bordercolor="#CCCCCC", borderwidth=1,
+            font=dict(color="#000000")
+        ),
+        margin=dict(l=80, r=80, t=100, b=120),
+    )
+    fig.update_xaxes(showgrid=True, gridcolor="#E0E0E0", linecolor="#666666",
+                     tickcolor="#666666", title_font_color="#000000", tickfont_color="#000000")
+    fig.update_yaxes(showgrid=True, gridcolor="#E0E0E0", linecolor="#666666",
+                     tickcolor="#666666", title_font_color="#000000", tickfont_color="#000000")
+    # 更新 annotations（副标题文字颜色）
+    for ann in fig.layout.annotations:
+        ann.font.color = "#333333"
+    return fig
+
 
 def create_axial_force_curve(df: pd.DataFrame, x_col: str, force_col: str, flow_unit: str) -> go.Figure:
     """绘制轴向力曲线，支持 Y 轴自由动态缩放。"""
