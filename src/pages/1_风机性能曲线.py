@@ -67,7 +67,6 @@ section[data-testid="stSidebar"] {
 }
 section[data-testid="stSidebar"] * {
     color: var(--white) !important;
-    font-family: var(--sans) !important;
 }
 
 /* ── Sidebar: Input Controls ── */
