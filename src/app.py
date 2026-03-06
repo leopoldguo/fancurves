@@ -1,12 +1,21 @@
 import streamlit as st
-
-# ============================================================
-# 主入口：使用 st.navigation() 显式注册所有页面
-# 这是 Streamlit 1.36+ 推荐的多页面方案，兼容性更好
-# ============================================================
-
 import os
 import base64
+
+# ============================================================
+# 预先导入所有重量级且带有 C 扩展的依赖库，防止 Streamlit Cloud 
+# 环境在 Python 3.13 下，由于通过 st.navigation 触发 exec(code) 
+# 加载多页面时产生 importlib 锁并发冲突 (KeyError: frozen importlib._bootstrap)
+# ============================================================
+import pandas as pd
+import numpy as np
+import plotly.graph_objects as go
+import plotly.express as px
+from plotly.subplots import make_subplots
+import scipy
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 
 st.set_page_config(
     page_title="IBI 工程师工具箱",
