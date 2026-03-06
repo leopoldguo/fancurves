@@ -15,34 +15,116 @@ st.set_page_config(page_title="Fan Performance Dashboard", layout="wide")
 
 st.markdown("""
 <style>
-    /* Industrial Theme CSS Injection */
-    .stMetricValue, .stNumberInput input, .stSlider div[role="slider"] {
-        font-family: 'Roboto Mono', 'Courier New', monospace !important;
-    }
-    /* Safety Orange for Sliders and Accents */
-    .stSlider div[data-baseweb="slider"] div {
-        background-color: #FF8C00 !important;
-    }
-    h1, h2, h3 {
-        color: #E0E0E0 !important;
-    }
-    /* ── IBI 品牌侧边栏蓝色主题 ── */
-    section[data-testid="stSidebar"] {
-        background-color: #4A6EA5 !important;
-    }
-    section[data-testid="stSidebar"] * {
-        color: #FFFFFF !important;
-    }
-    section[data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] > div,
-    section[data-testid="stSidebar"] .stNumberInput input,
-    section[data-testid="stSidebar"] .stTextInput input {
-        background-color: #3A5A8A !important;
-        border-color: #6A90C5 !important;
-        color: #FFFFFF !important;
-    }
-    section[data-testid="stSidebar"] hr {
-        border-color: #6A90C5 !important;
-    }
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600&display=swap');
+
+/* ── Root Variables ── */
+:root {
+    --blue-brand:   #3B5FA0;
+    --blue-dark:    #2A4580;
+    --blue-light:   #5A80C8;
+    --blue-accent:  #7EAAEE;
+    --white:        #F5F7FA;
+    --white-dim:    rgba(245,247,250,0.75);
+    --bg-main:      #0F1117;
+    --bg-card:      rgba(255,255,255,0.04);
+    --border:       rgba(255,255,255,0.12);
+    --mono:         'IBM Plex Mono', monospace;
+    --sans:         'IBM Plex Sans', sans-serif;
+}
+
+/* ── Global ── */
+html, body, [class*="css"] {
+    font-family: var(--sans) !important;
+}
+
+/* ── Sidebar: IBI Brand Blue ── */
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, var(--blue-brand) 0%, var(--blue-dark) 100%) !important;
+    border-right: 1px solid rgba(255,255,255,0.10) !important;
+}
+section[data-testid="stSidebar"] * {
+    color: var(--white) !important;
+    font-family: var(--sans) !important;
+}
+
+/* ── Sidebar: Input Controls ── */
+section[data-testid="stSidebar"] input,
+section[data-testid="stSidebar"] div[data-baseweb="select"] > div {
+    background-color: rgba(0,0,0,0.25) !important;
+    border: 1px solid rgba(255,255,255,0.25) !important;
+    border-radius: 4px !important;
+    color: var(--white) !important;
+    font-family: var(--mono) !important;
+}
+section[data-testid="stSidebar"] input:focus {
+    border-color: var(--blue-accent) !important;
+    box-shadow: 0 0 0 2px rgba(126,170,238,0.25) !important;
+}
+
+/* ── Sidebar: Divider & Expander ── */
+section[data-testid="stSidebar"] hr {
+    border-color: rgba(255,255,255,0.20) !important;
+    margin: 8px 0 !important;
+}
+section[data-testid="stSidebar"] details {
+    background: rgba(0,0,0,0.15) !important;
+    border-radius: 6px !important;
+    padding: 4px 8px !important;
+}
+
+/* ── File Uploader (Glassmorphism) ── */
+[data-testid="stFileUploader"] {
+    background: rgba(59,95,160,0.15) !important;
+    border: 1.5px dashed rgba(94,140,220,0.60) !important;
+    border-radius: 8px !important;
+    padding: 8px 12px !important;
+    backdrop-filter: blur(4px) !important;
+}
+[data-testid="stFileUploader"] * {
+    color: var(--white-dim) !important;
+}
+[data-testid="stFileUploader"] button {
+    background: var(--blue-brand) !important;
+    border: none !important;
+    color: white !important;
+    border-radius: 4px !important;
+}
+[data-testid="stFileUploader"] button:hover {
+    background: var(--blue-light) !important;
+}
+
+/* ── Headings ── */
+h1, h2, h3 {
+    font-family: var(--sans) !important;
+    color: var(--white) !important;
+    letter-spacing: -0.01em !important;
+}
+h2, h3 {
+    border-bottom: 1px solid var(--border) !important;
+    padding-bottom: 4px !important;
+}
+
+/* ── Metric Values (Monospace for Data) ── */
+[data-testid="stMetricValue"],
+[data-testid="stMetricDelta"],
+.stNumberInput input {
+    font-family: var(--mono) !important;
+    letter-spacing: 0.02em !important;
+}
+
+/* ── Container Cards ── */
+[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"] {
+    background: var(--bg-card) !important;
+    border-radius: 8px !important;
+}
+
+/* ── Radio Buttons in Sidebar ── */
+section[data-testid="stSidebar"] [data-testid="stRadio"] label {
+    background: rgba(0,0,0,0.15) !important;
+    border-radius: 4px !important;
+    padding: 2px 8px !important;
+    margin: 2px 0 !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
