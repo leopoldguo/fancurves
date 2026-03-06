@@ -291,13 +291,16 @@ def filter_operating_points(
         new_rows.extend(refined)
     result_df = pd.DataFrame(new_rows)
 
-    # 喘振线 = 每条转速曲线的左端点（用户已在数据中标记好的喘振位置）
-    # 直接连接各速度曲线的最高压力点（即过滤后每条曲线的起始端点）
-    if peak_info:
-        surge_line_df = pd.DataFrame([
-            {flow_col: info["flow"], pressure_col: info["pressure"]}
-            for info in peak_info.values()
-        ]).sort_values(by=pressure_col).reset_index(drop=True)
+    # 喘振线 = 每条转速曲线的最左端点（Phase C 过滤后实际显示曲线的起点）
+    # 这些点就是图上每条曲线可见的起始端，连起来即为喘振线
+    _surge_pts = []
+    for _spd in result_df["speed_rpm"].unique() if not result_df.empty else []:
+        _sd = result_df[result_df["speed_rpm"] == _spd].sort_values(by=flow_col)
+        if not _sd.empty:
+            _r = _sd.iloc[0]
+            _surge_pts.append({flow_col: _r[flow_col], pressure_col: _r[pressure_col]})
+    if _surge_pts:
+        surge_line_df = pd.DataFrame(_surge_pts).sort_values(by=pressure_col).reset_index(drop=True)
     else:
         surge_line_df = pd.DataFrame()
 
