@@ -329,21 +329,17 @@ def create_performance_curve(
             smooth_level=eff_smooth,
         )
 
-    # 标题和副标题对调：文件名为大标题，"风机性能曲线图"为稍小的副标题
-    main_title_text = chart_title if chart_title else "风机性能曲线图"
-    
-    annotations = []
+    # 标题和副标题对调：使用 Plotly 支持的 HTML 标签保证两者完美居中对齐
     if chart_title:
-        annotations.append(dict(
-            text="风机性能曲线图",
-            x=0.5, y=1.08, xref="paper", yref="paper",
-            xanchor="center", yanchor="bottom",
-            font=dict(size=15, color="#A0B4D0", family="IBM Plex Sans, sans-serif"),
-            showarrow=False
-        ))
+        main_title_text = f"<b>{chart_title}</b><br><span style='font-size:15px;color:#A0B4D0;'>风机性能曲线图</span>"
+    else:
+        main_title_text = "<b>风机性能曲线图</b>"
+    
+    # 移除之前的 annotation，完全用 title 接管
+    annotations = []
 
     fig.update_layout(
-        title=dict(text=main_title_text, x=0.5, xanchor="center", font=dict(size=22, color="#F5F7FA")),
+        title=dict(text=main_title_text, x=0.5, y=0.96, xanchor="center", yanchor="top", font=dict(size=22, color="#F5F7FA")),
         plot_bgcolor="#131B2E", paper_bgcolor="#131B2E",
         hovermode="x unified",
         font=dict(family="IBM Plex Sans, sans-serif", size=13, color="#E8EDF5"),
