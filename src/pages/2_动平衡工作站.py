@@ -10,24 +10,6 @@ except ImportError:
 
 _static = os.path.join(os.path.dirname(__file__), "..", "static")
 
-# --- 强制侧边栏展开并锁定 ---
-st.components.v1.html(
-    """
-    <script>
-        const checkCollapsed = setInterval(() => {
-            const expandDom = window.parent.document.querySelector('[data-testid="collapsedControl"]');
-            if (expandDom) {
-                const btn = expandDom.querySelector('button') || expandDom;
-                btn.click();
-            }
-        }, 50);
-        setTimeout(() => clearInterval(checkCollapsed), 1500);
-    </script>
-    """,
-    height=0,
-    width=0,
-)
-
 def get_transparent_logo_b64(logo_path: str) -> str:
     """读取带有深色背景的 Logo，将其转换为带透明通道 (Alpha) 的纯白 Logo"""
     img = Image.open(logo_path).convert("RGB")
@@ -90,9 +72,9 @@ st.markdown("""
 header {background: transparent !important;}
 footer {visibility: hidden;}
 
-/* 禁止用户收起侧边栏：仅隐藏侧边栏内部的收起按钮 */
-[data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"],
-[data-testid="stSidebar"] [data-testid="baseButton-headerNoPadding"] {
+/* 禁止用户收起侧边栏：仅隐藏处于展开状态侧边栏内的收起按钮，防止误伤外层的展开按钮 */
+[data-testid="stSidebar"][aria-expanded="true"] [data-testid="stSidebarCollapseButton"],
+[data-testid="stSidebar"][aria-expanded="true"] [data-testid="baseButton-headerNoPadding"] {
     display: none !important;
 }
 

@@ -11,23 +11,6 @@ from plotter import create_performance_curve, create_performance_curve_export
 import json
 import os
 
-# --- 强制侧边栏展开并锁定 ---
-st.components.v1.html(
-    """
-    <script>
-        const checkCollapsed = setInterval(() => {
-            const expandDom = window.parent.document.querySelector('[data-testid="collapsedControl"]');
-            if (expandDom) {
-                const btn = expandDom.querySelector('button') || expandDom;
-                btn.click();
-            }
-        }, 50);
-        setTimeout(() => clearInterval(checkCollapsed), 1500);
-    </script>
-    """,
-    height=0,
-    width=0,
-)
 
 st.markdown("""
 <style>
