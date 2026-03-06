@@ -407,7 +407,7 @@ def create_performance_curve_export(fig_dark: go.Figure) -> go.Figure:
             dict(
                 source=f"data:image/png;base64,{b64_logo}",
                 xref="paper", yref="paper",
-                x=0.05, y=1.18,  # X 微距，Y 抬高至标题对应高度
+                x=-0.03, y=1.18,  # x: -0.03 顶着左出图框边缘，y: 1.18 保持和标题高度相同
                 sizex=0.25, sizey=0.25,
                 xanchor="left", yanchor="top",
                 opacity=1.0,
