@@ -324,15 +324,14 @@ def create_performance_curve(
             
         fig = _add_efficiency_contours(
             fig, eff_df, x_col=x_col, y_col=y1_col,
-            eff_col="efficiency",
-            contour_step_pct=eff_contour_step,
-            smooth_level=eff_smooth,
-        )
+    # 去掉文件名的后缀（如 .csv）
+    _display_title = chart_title.rsplit(".", 1)[0] if chart_title and "." in chart_title else chart_title
 
     # 标题和副标题对调：使用 Plotly 支持的 HTML 标签保证两者完美居中对齐
-    if chart_title:
-        main_title_text = f"<b>{chart_title}</b><br><span style='font-size:15px;color:#A0B4D0;'>风机性能曲线图</span>"
+    if _display_title:
+        main_title_text = f"<b>{_display_title}</b><br><span style='font-size:15px;color:#A0B4D0;'>风机性能曲线图</span>"
     else:
+
         main_title_text = "<b>风机性能曲线图</b>"
     
     # 移除之前的 annotation，完全用 title 接管
