@@ -171,37 +171,33 @@ section[data-testid="stSidebar"] [data-testid="stNumberInput"] button span {
 </style>
 """, unsafe_allow_html=True)
 
-# ─── 头部标题与 Logo (居中显示) ──────────────────────────────────────────────────
-col_logo1, col_logo2, col_logo3 = st.columns([1, 0.8, 1])
-with col_logo2:
-    # 鲁棒性增强：寻找 IBI Logo.jpeg 的多种可能位置
-    logo_filename = "IBI Logo.jpeg"
-    possible_paths = [
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", logo_filename), # 源码上一级
-        os.path.join(os.getcwd(), logo_filename),                                     # 当前工作目录
-        logo_filename                                                                 # 直接相对路径
-    ]
-    
-    logo_to_show = None
-    for p in possible_paths:
-        if os.path.exists(p):
-            logo_to_show = p
-            break
-            
-    if logo_to_show:
-        import base64
-        with open(logo_to_show, "rb") as f:
-            logo_b64 = base64.b64encode(f.read()).decode()
-        ext = os.path.splitext(logo_to_show)[1].lower().replace(".", "")
-        mime = "jpeg" if ext in ("jpg", "jpeg") else ext
-        st.markdown(
-            f'<img src="data:image/{mime};base64,{logo_b64}" style="width:100%;display:block;">',
-            unsafe_allow_html=True
-        )
-    else:
-        pass
+# ─── 头部标题与 Logo (纯 HTML，无 Streamlit 组件层) ───────────────────────────
+_header_logo_filename = "IBI Logo.jpeg"
+_header_logo_paths = [
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", _header_logo_filename),
+    os.path.join(os.getcwd(), _header_logo_filename),
+]
+_header_logo_b64 = ""
+for _p in _header_logo_paths:
+    if os.path.exists(_p):
+        import base64 as _b64h
+        with open(_p, "rb") as _hf:
+            _header_logo_b64 = _b64h.b64encode(_hf.read()).decode()
+        break
 
-st.markdown("<h1 style='text-align: center; margin-top: -20px;'>风机性能曲线数据看板</h1>", unsafe_allow_html=True)
+if _header_logo_b64:
+    _logo_html = f'<img src="data:image/jpeg;base64,{_header_logo_b64}" style="height:80px;max-width:340px;object-fit:contain;">'
+else:
+    _logo_html = ""
+
+st.markdown(f"""
+<div style="text-align:center; padding: 16px 0 8px 0;">
+    {_logo_html}
+    <h1 style="margin:8px 0 0 0; font-size:1.6rem; color:#F5F7FA; font-family:\'IBM Plex Sans\',sans-serif; font-weight:600; letter-spacing:-0.01em;">
+        风机性能曲线数据看板
+    </h1>
+</div>
+""", unsafe_allow_html=True)
 
 PREFS_FILE = "user_prefs.json"
 
