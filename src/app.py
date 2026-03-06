@@ -23,18 +23,19 @@ st.markdown("""
 <style>
 /* 修复侧边栏带有 logo 时的超大间隔和不对齐问题 */
 [data-testid="stSidebarNav"] {
-    /* 取消导致重叠的巨大负边距，恢复正常但偏小的间距 */
-    margin-top: 1rem !important;
+    /* 调整导航上下边距，使其与上方 Logo 保持舒适距离 */
+    padding-top: 1.5rem !important;
 }
 [data-testid="stLogo"] {
-    /* 将 Logo 整体下移一点并与左侧文字对齐 */
-    margin-top: 1rem !important;
-    margin-left: 1.2rem !important;
-    margin-bottom: 0.5rem !important;
+    /* Logo 原始容器下移，与导航的左侧留白看齐 */
+    margin-top: 2rem !important;
+    margin-left: 1.5rem !important;
+    margin-bottom: 0rem !important;
 }
 [data-testid="stLogo"] img {
-    /* 强制限制 Logo 的最大高度，防止其过大 */
-    max-height: 40px !important;
+    /* 把 Logo 放大！Streamlit 默认卡得非常死，我们强行放大它的最大高度范围 */
+    max-height: 55px !important;
+    height: auto !important;
     width: auto !important;
 }
 </style>
