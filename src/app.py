@@ -25,7 +25,7 @@ st.markdown("""
     --blue-accent:  #7EAAEE;
     --white:        #F5F7FA;
     --white-dim:    rgba(245,247,250,0.75);
-    --bg-main:      #0F1117;
+    --bg-main:      #131B2E;
     --bg-card:      rgba(255,255,255,0.04);
     --border:       rgba(255,255,255,0.12);
     --mono:         'IBM Plex Mono', monospace;
@@ -35,6 +35,13 @@ st.markdown("""
 /* ── Global ── */
 html, body, [class*="css"] {
     font-family: var(--sans) !important;
+    background-color: var(--bg-main) !important;
+}
+/* 主内容区域背景 */
+[data-testid="stAppViewContainer"],
+[data-testid="stMain"],
+.main .block-container {
+    background-color: var(--bg-main) !important;
 }
 
 /* ── Sidebar: IBI Brand Blue ── */
@@ -142,6 +149,25 @@ section[data-testid="stSidebar"] [data-testid="stRadio"] label {
     padding: 2px 8px !important;
     margin: 2px 0 !important;
 }
+/* ── Number Input +/- Buttons ── */
+section[data-testid="stSidebar"] button[aria-label="增加"],
+section[data-testid="stSidebar"] button[aria-label="减少"],
+section[data-testid="stSidebar"] [data-testid="stNumberInput"] button,
+section[data-testid="stSidebar"] [data-testid="stNumberInputStepUp"],
+section[data-testid="stSidebar"] [data-testid="stNumberInputStepDown"] {
+    background: rgba(255,255,255,0.15) !important;
+    border: 1px solid rgba(255,255,255,0.3) !important;
+    border-radius: 3px !important;
+    color: var(--white) !important;
+}
+section[data-testid="stSidebar"] [data-testid="stNumberInput"] button:hover {
+    background: rgba(255,255,255,0.28) !important;
+}
+section[data-testid="stSidebar"] [data-testid="stNumberInput"] button svg,
+section[data-testid="stSidebar"] [data-testid="stNumberInput"] button span {
+    color: var(--white) !important;
+    fill: var(--white) !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -242,7 +268,13 @@ def calc_specific_speed(rpm, flow_val, flow_unit, pr):
 # ─── 侧边栏 ───────────────────────────────────────────────────────────────────
 _logo_sidebar = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "logo_compressor.png")
 if os.path.exists(_logo_sidebar):
-    st.sidebar.image(_logo_sidebar, use_container_width=True)
+    import base64 as _b64
+    with open(_logo_sidebar, "rb") as _f:
+        _logo_b64 = _b64.b64encode(_f.read()).decode()
+    st.sidebar.markdown(
+        f'<img src="data:image/png;base64,{_logo_b64}" style="width:100%;display:block;margin-bottom:8px;">',
+        unsafe_allow_html=True
+    )
 st.sidebar.header("控制面板")
 
 page_mode = st.sidebar.radio(
