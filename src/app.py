@@ -185,36 +185,39 @@ section[data-testid="stSidebar"] [data-testid="stNumberInput"] button span {
 """, unsafe_allow_html=True)
 
 # ─── 头部标题与 Logo (纯 HTML，无 Streamlit 组件层) ───────────────────────────
-_header_logo_filename = "IBI Logo.jpeg"
+_header_logo_filename = "IBI Logo.png"
 _header_logo_paths = [
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", _header_logo_filename),
     os.path.join(os.getcwd(), _header_logo_filename),
+    # fallback to old jpeg
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "IBI Logo.jpeg"),
+    os.path.join(os.getcwd(), "IBI Logo.jpeg"),
 ]
 _header_logo_b64 = ""
+_header_mime = "png"
+import base64 as _b64h
 for _p in _header_logo_paths:
     if os.path.exists(_p):
-        import base64 as _b64h
         with open(_p, "rb") as _hf:
             _header_logo_b64 = _b64h.b64encode(_hf.read()).decode()
+        _header_mime = "png" if _p.lower().endswith(".png") else "jpeg"
         break
 
+# Logo + 标题居中（一行 flexbox，logo 在左，标题紧随其后）
 if _header_logo_b64:
-    _logo_html = f'<img src="data:image/jpeg;base64,{_header_logo_b64}" style="height:80px;max-width:340px;object-fit:contain;">'
-else:
-    _logo_html = ""
-
-# Logo 居中
-if _logo_html:
-    st.markdown(
-        f'<div style="text-align:center; padding: 16px 0 4px 0;">{_logo_html}</div>',
-        unsafe_allow_html=True
+    _logo_tag = (
+        f'<img src="data:image/{_header_mime};base64,{_header_logo_b64}" '
+        f'style="height:72px;width:72px;object-fit:contain;border-radius:8px;margin-right:16px;">'
     )
+else:
+    _logo_tag = ""
 
-# 标题居中（独立渲染，不受 base64 大小影响）
 st.markdown(
-    "<h1 style='text-align:center; margin:4px 0 8px 0; font-size:1.6rem; color:#F5F7FA;"
-    " font-family:IBM Plex Sans,sans-serif; font-weight:600; letter-spacing:-0.01em;'>"
-    "风机性能曲线数据看板</h1>",
+    f'<div style="display:flex;align-items:center;justify-content:center;padding:16px 0 8px 0;">'
+    f'{_logo_tag}'
+    f'<h1 style="margin:0;font-size:2.2rem;color:#F5F7FA;font-family:IBM Plex Sans,sans-serif;'
+    f'font-weight:700;letter-spacing:-0.02em;line-height:1.15;">风机性能曲线数据看板</h1>'
+    f'</div>',
     unsafe_allow_html=True
 )
 
