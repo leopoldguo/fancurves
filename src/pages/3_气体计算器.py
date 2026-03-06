@@ -26,7 +26,8 @@ def load_html(filename: str, logo_filter: str = "brightness(0) invert(1)") -> st
     filter_css = f"""
 <style>
 .logo-img, img[alt="IBI Logo"], .header-logo {{
-    filter: {logo_filter} !important;
+    mix-blend-mode: screen !important;
+    filter: none !important;
 }}
 </style>
 """
