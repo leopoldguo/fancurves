@@ -6,6 +6,10 @@ st.markdown("""
 <style>
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
+/* 减小顶部留白 */
+.block-container {
+    padding-top: 2rem !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -13,7 +17,7 @@ footer {visibility: hidden;}
 _, col2, _ = st.columns([1, 8, 1])
 
 with col2:
-    st.markdown("<br><br>", unsafe_allow_html=True)
+
     st.markdown(
         """
         <div style='text-align: center;'>
