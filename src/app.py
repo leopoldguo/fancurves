@@ -117,6 +117,9 @@ def calc_specific_speed(rpm, flow_val, flow_unit, pr):
     return rpm * math.sqrt(q) / (h_ad_m**0.75)
 
 # ─── 侧边栏 ───────────────────────────────────────────────────────────────────
+_logo_sidebar = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "logo_compressor.png")
+if os.path.exists(_logo_sidebar):
+    st.sidebar.image(_logo_sidebar, use_container_width=True)
 st.sidebar.header("控制面板")
 
 page_mode = st.sidebar.radio(
