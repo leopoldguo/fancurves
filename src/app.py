@@ -15,30 +15,33 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 读取透明 Logo 并转换为 base64
+# 读取透明 Logo 路径并转换
 logo_path = os.path.join(os.path.dirname(__file__), "assets", "logo_transparent.png")
 with open(logo_path, "rb") as f:
     logo_base64 = base64.b64encode(f.read()).decode()
 
-# 读取透明 Logo 路径
-logo_path = os.path.join(os.path.dirname(__file__), "assets", "logo_transparent.png")
-st.logo(logo_path)
-
-# 全局侧边栏对齐样式修复与 Logo 放大
+# 使用 CSS ::before 伪元素在导航栏的最上方作为独立区块渲染完整的自适应 Logo
 st.markdown(
     f"""
     <style>
-        /* 稍微拉开侧边导航菜单与 Logo 之间的间距 */
-        [data-testid="stSidebarNav"] {{
-            padding-top: 3rem !important;
+        /* 隐藏掉带有天生尺寸锁死包袱的原生 st.logo */
+        [data-testid="stLogo"] {{
+            display: none !important;
         }}
         
-        /* 使用物理变换直接强行放大 Logo 1.8倍，无视容器限制 */
-        [data-testid="stLogo"] {{
-            transform: scale(1.8);
-            transform-origin: top left;
-            margin-top: 5px;
-            margin-left: 10px;
+        /* 在侧边菜单栏内直接插入一个虚拟元素当 Logo */
+        [data-testid="stSidebarNav"]::before {{
+            content: "";
+            display: block;
+            width: 85%;
+            height: 65px; /* 按照 4.3 的宽高比计算出合理且较大的高度 */
+            margin-left: 1.5rem;
+            margin-top: 1rem;
+            margin-bottom: 2rem;
+            background-image: url("data:image/png;base64,{logo_base64}");
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: left center;
         }}
     </style>
     """,
