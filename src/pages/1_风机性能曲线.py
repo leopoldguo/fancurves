@@ -16,14 +16,14 @@ import os
 components.html(
     """
     <script>
-        const parent = window.parent.document;
         const checkCollapsed = setInterval(() => {
-            const expandBtn = parent.querySelector('[data-testid="collapsedControl"]');
-            if (expandBtn) {
-                expandBtn.click();
+            const expandDom = window.parent.document.querySelector('[data-testid="collapsedControl"]');
+            if (expandDom) {
+                const btn = expandDom.querySelector('button') || expandDom;
+                btn.click();
             }
         }, 50);
-        setTimeout(() => clearInterval(checkCollapsed), 1000);
+        setTimeout(() => clearInterval(checkCollapsed), 1500);
     </script>
     """,
     height=0,

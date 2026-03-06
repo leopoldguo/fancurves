@@ -15,14 +15,14 @@ _static = os.path.join(os.path.dirname(__file__), "..", "static")
 components.html(
     """
     <script>
-        const parent = window.parent.document;
         const checkCollapsed = setInterval(() => {
-            const expandBtn = parent.querySelector('[data-testid="collapsedControl"]');
-            if (expandBtn) {
-                expandBtn.click();
+            const expandDom = window.parent.document.querySelector('[data-testid="collapsedControl"]');
+            if (expandDom) {
+                const btn = expandDom.querySelector('button') || expandDom;
+                btn.click();
             }
         }, 50);
-        setTimeout(() => clearInterval(checkCollapsed), 1000);
+        setTimeout(() => clearInterval(checkCollapsed), 1500);
     </script>
     """,
     height=0,
@@ -36,23 +36,16 @@ def get_transparent_logo_b64(logo_path: str) -> str:
     
     # 假设左上角第一个像素是纯背景色
     bg_r, bg_g, bg_b = data[0]
-    # 计算背景的亮度 luminance
-    bg_l = 0.299 * bg_r + 0.587 * bg_g + 0.114 * bg_b
     
-    # 亮度差值 (纯白 255 - 背景亮度)
-    diff = 255 - bg_l
-    if diff < 1:
-        diff = 1 # 防除零
-        
     new_data = []
-    for r, g, b in data:
-        l = 0.299 * r + 0.587 * g + 0.114 * b
-        # 当前像素比背景亮多少，按比例折算成 Alpha 不透明度
-        alpha = int((l - bg_l) / diff * 255)
-        alpha = max(0, min(255, alpha))
-        # 始终输出纯白色，仅仅靠 Alpha 通道来显示图案
-        new_data.append((255, 255, 255, alpha))
-        
+    for item in data:
+        # 如果像素颜色接近背景色，则使其透明
+        if abs(item[0] - bg_r) < 30 and abs(item[1] - bg_g) < 30 and abs(item[2] - bg_b) < 30:
+            new_data.append((255, 255, 255, 0))
+        else:
+            # 否则将其转换为白色（原图字是白的，其他边缘也变白）
+            new_data.append((255, 255, 255, 255))
+            
     img_out = Image.new("RGBA", img.size)
     img_out.putdata(new_data)
     
@@ -81,9 +74,7 @@ def load_html(filename: str) -> str:
     # For now, we'll define a placeholder if it's not provided by the user's context.
     # If the user intended to inject the CSS from the st.markdown block into the HTML,
     # they would need to define filter_css with that content.
-    # Based on the instruction, the st.markdown block is added separately.
-    # If filter_css is truly undefined and meant to be added, this line will cause an error.
-    # Given the instruction, I will add the line as requested, assuming filter_css is defined in the user's full context.
+    # Based on the instruction, I will add the line as requested, assuming filter_css is defined in the user's full context.
     # However, to make the code syntactically correct and runnable, I will define a dummy filter_css.
     # If the user intended to inject the CSS from the st.markdown block into the HTML,
     # the filter_css variable should contain that CSS.
@@ -100,8 +91,9 @@ st.markdown("""
 header {background: transparent !important;}
 footer {visibility: hidden;}
 
-/* 禁止用户收起侧边栏：隐藏收起按钮 */
-[data-testid="stSidebarCollapseButton"] {
+/* 禁止用户收起侧边栏：仅隐藏侧边栏内部的收起按钮 */
+[data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"],
+[data-testid="stSidebar"] [data-testid="baseButton-headerNoPadding"] {
     display: none !important;
 }
 
