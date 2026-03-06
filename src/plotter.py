@@ -345,7 +345,7 @@ def create_performance_curve(
         title=dict(text=main_title_text, x=0.5, y=0.96, xanchor="center", yanchor="top", font=dict(size=22, color="#F5F7FA")),
         plot_bgcolor="#131B2E", paper_bgcolor="#131B2E",
         hovermode="x unified",
-        font=dict(family="Arial, 'Microsoft YaHei', sans-serif", size=13, color="#E8EDF5"),
+        font=dict(family="Microsoft YaHei, Arial, sans-serif", size=13, color="#E8EDF5"),
         legend=dict(orientation="v", bordercolor="rgba(126,170,238,0.3)",
                     borderwidth=1, bgcolor="rgba(19,27,46,0.90)"),
         margin=dict(l=80, r=80, t=100, b=60),
@@ -376,7 +376,7 @@ def create_performance_curve_export(fig_dark: go.Figure) -> go.Figure:
     fig.update_layout(
         plot_bgcolor="#FFFFFF",
         paper_bgcolor="#FFFFFF",
-        font=dict(family="Arial, 'Microsoft YaHei', sans-serif", color="#000000"),
+        font=dict(family="Microsoft YaHei, Arial, sans-serif", color="#000000"),
         title_font_color="#000000",
         legend=dict(
             orientation="h",
