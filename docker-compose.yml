@@ -5,10 +5,13 @@ services:
     build: .
     container_name: curves-streamlit
     restart: unless-stopped
-    ports:
-      - "8501:8501"  # 外部端口:内部端口，可以根据需要修改前面的 8501
+    network_mode: host
     environment:
       - TZ=Asia/Shanghai # 给容器设定正确的时区
-    # 如果你在群晖上需要映射额外的卷（保存配置等），可添加 volumes：
-    # volumes:
-    #   - ./data:/app/data
+      # 允许 Cloudflare 进行跨域请求
+      - STREAMLIT_SERVER_ENABLE_CORS=false
+      # 关闭 CSRF 验证（否则通过隧道可能会白屏）
+      - STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION=false
+      # 【关键参数】允许来自 Cloudflare 的网页代理转发
+      - STREAMLIT_SERVER_HEADLESS=true
+      - STREAMLIT_SERVER_ADDRESS=0.0.0.0
