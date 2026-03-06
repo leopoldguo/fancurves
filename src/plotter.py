@@ -359,7 +359,7 @@ def create_performance_curve(
     fig.update_yaxes(title_text=y1_label, secondary_y=False,
                      showgrid=True, gridcolor='rgba(94,128,200,0.2)',
                      showline=True, linecolor='rgba(94,128,200,0.5)', linewidth=1.5,
-                     ticks="outside", ticklen=6, tickcolor='rgba(94,128,200,0.5)', mirror=False)
+                     ticks="outside", ticklen=6, tickcolor='rgba(94,128,200,0.5)', mirror=True)
     fig.update_yaxes(title_text=y2_label if show_power else "",
                      secondary_y=True,
                      showgrid=False,

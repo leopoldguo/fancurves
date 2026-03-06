@@ -489,7 +489,8 @@ if uploaded_file:
                     mime="image/png"
                 )
             except Exception as e:
-                plot_container.info("💡 鼠标悬停在图表右上角 → 相机图标 → 下载高清 PNG")
+                plot_container.warning(f"⚠️ 生成白底高清图失败: {str(e)}。请确保已安装 kaleido==0.2.1")
+                plot_container.info("💡 鼠标悬停在图表右上角 → 相机图标 → 下载普通版 PNG")
 
         # ─── 统计容器 ──────────────────────────────────────────────────────────────
             stat_container = st.container(border=True)
