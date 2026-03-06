@@ -24,13 +24,24 @@ with open(logo_path, "rb") as f:
 logo_path = os.path.join(os.path.dirname(__file__), "assets", "logo_transparent.png")
 st.logo(logo_path)
 
-# 全局侧边栏对齐样式修复（仅做轻微间距修正，不再干涉大小、DOM或背景堆叠）
+# 全局侧边栏对齐样式修复与 Logo 放大
 st.markdown(
     f"""
     <style>
         /* 稍微拉开侧边导航菜单与 Logo 之间的间距 */
         [data-testid="stSidebarNav"] {{
             padding-top: 2rem !important;
+        }}
+        
+        /* 强制突破原生 st.logo 的高度限制，放大至少 50% */
+        [data-testid="stLogo"] {{
+            height: 3.5rem !important; /* 默认约 1.5~2rem，这里拉高 */
+            margin-bottom: 0.5rem !important;
+        }}
+        [data-testid="stLogo"] img {{
+            max-height: 100% !important;
+            height: 100% !important;
+            width: auto !important;
         }}
     </style>
     """,
