@@ -20,19 +20,42 @@ logo_path = os.path.join(os.path.dirname(__file__), "assets", "logo_transparent.
 with open(logo_path, "rb") as f:
     logo_base64 = base64.b64encode(f.read()).decode()
 
-# 利用 CSS 的 background-image 霸道注入：直接把 Logo 印在侧边导航栏 (stSidebarNav) 的正上方
-# 因为 st.navigation 默认强制排在侧边栏最先，所以只能在上方的 padding 里画图，这是 100% 确保它在最顶部的终极方案！
+# 读取透明 Logo 并转换为 base64
+logo_path = os.path.join(os.path.dirname(__file__), "assets", "logo_transparent.png")
+with open(logo_path, "rb") as f:
+    logo_base64 = base64.b64encode(f.read()).decode()
+
+# 最稳定跨浏览器方案：直接通过原生 Markdown 渲染一个绝对定位在左上角的 Logo
 st.markdown(
     f"""
     <style>
-        [data-testid="stSidebarNav"] {{
-            padding-top: 110px !important;
-            background-image: url("data:image/png;base64,{logo_base64}");
-            background-repeat: no-repeat;
-            background-size: 80% auto;
-            background-position: 25px 30px;
+        /* 强制给 Streamlit 的侧边栏顶部腾出 120px 的空间 */
+        [data-testid="stSidebarHeader"] {{
+            padding-bottom: 90px !important;
+        }}
+        
+        /* 创建一个幽灵层，绝对定位悬浮在侧边栏最顶端 */
+        .sidebar-logo-container {{
+            position: absolute;
+            top: 2rem;
+            left: 2rem;
+            width: 80%;
+            z-index: 1000;
+        }}
+        .sidebar-logo {{
+            width: 100%;
+            height: auto;
         }}
     </style>
+    """,
+    unsafe_allow_html=True
+)
+
+st.sidebar.markdown(
+    f"""
+    <div class="sidebar-logo-container">
+        <img class="sidebar-logo" src="data:image/png;base64,{logo_base64}">
+    </div>
     """,
     unsafe_allow_html=True
 )
