@@ -407,9 +407,9 @@ def create_performance_curve_export(fig_dark: go.Figure) -> go.Figure:
             dict(
                 source=f"data:image/png;base64,{b64_logo}",
                 xref="paper", yref="paper",
-                x=-0.02, y=0.98,  # 和居中标题 ("7.5KW...") 水平对齐
+                x=0.18, y=1.00,  # X 往右移以对齐标题，Y 微调垂直居中
                 sizex=0.25, sizey=0.25,
-                xanchor="left", yanchor="top",
+                xanchor="right", yanchor="top",
                 opacity=1.0,
                 layer="above"
             )
