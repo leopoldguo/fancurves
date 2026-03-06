@@ -329,19 +329,21 @@ def create_performance_curve(
             smooth_level=eff_smooth,
         )
 
-    # 文件名副标题 (annotation 放在图表顶部居中)
+    # 标题和副标题对调：文件名为大标题，"风机性能曲线图"为稍小的副标题
+    main_title_text = chart_title if chart_title else "风机性能曲线图"
+    
     annotations = []
     if chart_title:
         annotations.append(dict(
-            text=chart_title,
-            x=0.5, y=1.10, xref="paper", yref="paper",
+            text="风机性能曲线图",
+            x=0.5, y=1.08, xref="paper", yref="paper",
             xanchor="center", yanchor="bottom",
-            font=dict(size=13, color="#A0B4D0", family="IBM Plex Sans, sans-serif"),
+            font=dict(size=15, color="#A0B4D0", family="IBM Plex Sans, sans-serif"),
             showarrow=False
         ))
 
     fig.update_layout(
-        title=dict(text="风机性能曲线图", x=0.5, xanchor="center", font=dict(size=18, color="#F5F7FA")),
+        title=dict(text=main_title_text, x=0.5, xanchor="center", font=dict(size=22, color="#F5F7FA")),
         plot_bgcolor="#131B2E", paper_bgcolor="#131B2E",
         hovermode="x unified",
         font=dict(family="IBM Plex Sans, sans-serif", size=13, color="#E8EDF5"),
