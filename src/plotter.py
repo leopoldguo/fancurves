@@ -396,10 +396,10 @@ def create_performance_curve_export(fig_dark: go.Figure) -> go.Figure:
     for ann in fig.layout.annotations:
         ann.font.color = "#333333"
 
-    # 添加带 slogon 的 Logo (logo_compressor.png)
+    # 添加带 slogon 的 Logo (logo_compressor_light.png 适配白底)
     import os
     import base64
-    logo_path = os.path.join(os.path.dirname(__file__), "assets", "logo_compressor.png")
+    logo_path = os.path.join(os.path.dirname(__file__), "assets", "logo_compressor_light.png")
     if os.path.exists(logo_path):
         with open(logo_path, "rb") as f:
             b64_logo = base64.b64encode(f.read()).decode()
@@ -407,7 +407,7 @@ def create_performance_curve_export(fig_dark: go.Figure) -> go.Figure:
             dict(
                 source=f"data:image/png;base64,{b64_logo}",
                 xref="paper", yref="paper",
-                x=0, y=1.12,
+                x=-0.02, y=0.98,  # 和居中标题 ("7.5KW...") 水平对齐
                 sizex=0.25, sizey=0.25,
                 xanchor="left", yanchor="top",
                 opacity=1.0,
