@@ -32,12 +32,26 @@ st.markdown("""
 # ─── 头部标题与 Logo (居中显示) ──────────────────────────────────────────────────
 col_logo1, col_logo2, col_logo3 = st.columns([1, 0.8, 1])
 with col_logo2:
-    logo_path = os.path.join(os.path.dirname(__file__), "..", "IBI Logo.jpeg")
-    if os.path.exists(logo_path):
-        st.image(logo_path, use_container_width=True)
+    # 鲁棒性增强：寻找 IBI Logo.jpeg 的多种可能位置
+    logo_filename = "IBI Logo.jpeg"
+    possible_paths = [
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", logo_filename), # 源码上一级
+        os.path.join(os.getcwd(), logo_filename),                                     # 当前工作目录
+        logo_filename                                                                 # 直接相对路径
+    ]
+    
+    logo_to_show = None
+    for p in possible_paths:
+        if os.path.exists(p):
+            logo_to_show = p
+            break
+            
+    if logo_to_show:
+        st.image(logo_to_show, use_container_width=True)
     else:
-        # 兼容性回退
-        st.image("IBI Logo.jpeg", use_container_width=True)
+        # 如果还是找不到，仅显示一个占位或跳过，避免报错崩溃
+        pass
+
 st.markdown("<h1 style='text-align: center; margin-top: -20px;'>风机性能曲线数据看板</h1>", unsafe_allow_html=True)
 
 PREFS_FILE = "user_prefs.json"
