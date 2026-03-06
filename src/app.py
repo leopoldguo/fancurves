@@ -30,18 +30,15 @@ st.markdown(
     <style>
         /* 稍微拉开侧边导航菜单与 Logo 之间的间距 */
         [data-testid="stSidebarNav"] {{
-            padding-top: 2rem !important;
+            padding-top: 3rem !important;
         }}
         
-        /* 强制突破原生 st.logo 的高度限制，放大至少 50% */
+        /* 使用物理变换直接强行放大 Logo 1.8倍，无视容器限制 */
         [data-testid="stLogo"] {{
-            height: 3.5rem !important; /* 默认约 1.5~2rem，这里拉高 */
-            margin-bottom: 0.5rem !important;
-        }}
-        [data-testid="stLogo"] img {{
-            max-height: 100% !important;
-            height: 100% !important;
-            width: auto !important;
+            transform: scale(1.8);
+            transform-origin: top left;
+            margin-top: 5px;
+            margin-left: 10px;
         }}
     </style>
     """,
