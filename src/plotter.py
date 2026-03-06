@@ -330,27 +330,27 @@ def create_performance_curve(
 
     fig.update_layout(
         title_text="Fan Performance Map", title_font_size=18,
-        plot_bgcolor="#1A1A1B", paper_bgcolor="#1A1A1B",
+        plot_bgcolor="#131B2E", paper_bgcolor="#131B2E",
         hovermode="x unified",
-        font=dict(family="'Roboto Mono', monospace", size=13, color="#E0E0E0"),
-        legend=dict(orientation="v", bordercolor="#555555",
-                    borderwidth=1, bgcolor="rgba(26,26,27,0.85)"),
+        font=dict(family="IBM Plex Sans, sans-serif", size=13, color="#E8EDF5"),
+        legend=dict(orientation="v", bordercolor="rgba(126,170,238,0.3)",
+                    borderwidth=1, bgcolor="rgba(19,27,46,0.90)"),
         margin=dict(l=80, r=80, t=80, b=60),
     )
     fig.update_xaxes(title_text=x_label,
-                     showgrid=True, gridcolor='#333333',
-                     showline=True, linecolor='#555555', linewidth=1.5,
-                     ticks="outside", ticklen=6, tickcolor='#555555', mirror=True)
+                     showgrid=True, gridcolor='rgba(94,128,200,0.2)',
+                     showline=True, linecolor='rgba(94,128,200,0.5)', linewidth=1.5,
+                     ticks="outside", ticklen=6, tickcolor='rgba(94,128,200,0.5)', mirror=True)
     fig.update_yaxes(title_text=y1_label, secondary_y=False,
-                     showgrid=True, gridcolor='#333333',
-                     showline=True, linecolor='#555555', linewidth=1.5,
-                     ticks="outside", ticklen=6, tickcolor='#555555', mirror=False)
+                     showgrid=True, gridcolor='rgba(94,128,200,0.2)',
+                     showline=True, linecolor='rgba(94,128,200,0.5)', linewidth=1.5,
+                     ticks="outside", ticklen=6, tickcolor='rgba(94,128,200,0.5)', mirror=False)
     fig.update_yaxes(title_text=y2_label if show_power else "",
                      secondary_y=True,
                      showgrid=False,
-                     showline=show_power, linecolor='#555555',
+                     showline=show_power, linecolor='rgba(94,128,200,0.5)',
                      ticks="outside" if show_power else "",
-                     ticklen=6, tickcolor='#555555' if show_power else "rgba(0,0,0,0)",
+                     ticklen=6, tickcolor='rgba(94,128,200,0.5)' if show_power else "rgba(0,0,0,0)",
                      showticklabels=show_power)
     return fig
 
@@ -377,19 +377,19 @@ def create_axial_force_curve(df: pd.DataFrame, x_col: str, force_col: str, flow_
 
     fig.update_layout(
         title_text="总轴向力特性分析图 (F_total = F_backplate - F_blade_hub)", title_font_size=16,
-        plot_bgcolor="#1A1A1B", paper_bgcolor="#1A1A1B",
+        plot_bgcolor="#131B2E", paper_bgcolor="#131B2E",
         hovermode="x unified",
-        font=dict(family="'Roboto Mono', monospace", size=13, color="#E0E0E0"),
-        legend=dict(orientation="v", bordercolor="#555555",
-                    borderwidth=1, bgcolor="rgba(26,26,27,0.85)"),
+        font=dict(family="IBM Plex Sans, sans-serif", size=13, color="#E8EDF5"),
+        legend=dict(orientation="v", bordercolor="rgba(126,170,238,0.3)",
+                    borderwidth=1, bgcolor="rgba(19,27,46,0.90)"),
         margin=dict(l=80, r=80, t=80, b=60),
     )
     fig.update_xaxes(title_text=f"流量 ({flow_unit})",
-                     showgrid=True, gridcolor='#333333',
-                     showline=True, linecolor='#555555', linewidth=1.5,
-                     ticks="outside", ticklen=6, tickcolor='#555555', mirror=True)
+                     showgrid=True, gridcolor='rgba(94,128,200,0.2)',
+                     showline=True, linecolor='rgba(94,128,200,0.5)', linewidth=1.5,
+                     ticks="outside", ticklen=6, tickcolor='rgba(94,128,200,0.5)', mirror=True)
     fig.update_yaxes(title_text="总轴向力 (N) [指向入口为正]",
-                     showgrid=True, gridcolor='#333333',
-                     showline=True, linecolor='#555555', linewidth=1.5,
-                     ticks="outside", ticklen=6, tickcolor='#555555', mirror=True)
+                     showgrid=True, gridcolor='rgba(94,128,200,0.2)',
+                     showline=True, linecolor='rgba(94,128,200,0.5)', linewidth=1.5,
+                     ticks="outside", ticklen=6, tickcolor='rgba(94,128,200,0.5)', mirror=True)
     return fig

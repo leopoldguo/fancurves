@@ -202,7 +202,7 @@ else:
 st.markdown(f"""
 <div style="text-align:center; padding: 16px 0 8px 0;">
     {_logo_html}
-    <h1 style="margin:8px 0 0 0; font-size:1.6rem; color:#F5F7FA; font-family:\'IBM Plex Sans\',sans-serif; font-weight:600; letter-spacing:-0.01em;">
+    <h1 style="margin:8px 0 0 0; font-size:1.6rem; color:#F5F7FA; font-family:IBM Plex Sans,sans-serif; font-weight:600; letter-spacing:-0.01em;">
         风机性能曲线数据看板
     </h1>
 </div>
