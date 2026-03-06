@@ -28,6 +28,18 @@ st.markdown("""
     --bg-main:      #131B2E;
     --bg-card:      rgba(255,255,255,0.04);
     --border:       rgba(255,255,255,0.12);
+}
+
+/* 隐藏 Streamlit 默认组件 */
+#MainMenu {visibility: hidden;}
+header {visibility: hidden;}
+footer {visibility: hidden;}
+
+/* 减小顶部留白 */
+.block-container {
+    padding-top: 1rem !important;
+}
+
     --mono:         'IBM Plex Mono', monospace;
     --sans:         'IBM Plex Sans', sans-serif;
 }
