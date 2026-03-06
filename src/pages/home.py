@@ -5,7 +5,8 @@ import streamlit as st
 st.markdown("""
 <style>
 #MainMenu {visibility: hidden;}
-header {visibility: hidden;}
+[data-testid="stHeaderActionElements"] {visibility: hidden;}
+header {background: transparent !important;}
 footer {visibility: hidden;}
 /* 减小顶部留白 */
 .block-container {

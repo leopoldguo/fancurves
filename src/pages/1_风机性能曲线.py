@@ -32,7 +32,8 @@ st.markdown("""
 
 /* 隐藏 Streamlit 默认组件 */
 #MainMenu {visibility: hidden;}
-header {visibility: hidden;}
+[data-testid="stHeaderActionElements"] {visibility: hidden;}
+header {background: transparent !important;}
 footer {visibility: hidden;}
 
 /* 减小顶部留白 */

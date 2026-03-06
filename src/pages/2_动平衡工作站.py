@@ -78,7 +78,8 @@ def load_html(filename: str) -> str:
 st.markdown("""
 <style>
 #MainMenu {visibility: hidden;}
-header {visibility: hidden;}
+[data-testid="stHeaderActionElements"] {visibility: hidden;}
+header {background: transparent !important;}
 footer {visibility: hidden;}
 .block-container {
     padding-top: 1rem !important;
