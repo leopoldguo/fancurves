@@ -289,12 +289,15 @@ def filter_operating_points(
             refined = surge_refined
 
         new_rows.extend(refined)
-
     result_df = pd.DataFrame(new_rows)
-    # 喘振线视觉：使用全部转速的锚点，保证线经过每条速度曲线的左侧边界
-    # 按压力从低到高排列，使绘图折线从低速→高速方向连接
-    if m_surge is not None and not surge_df.empty:
-        surge_line_df = surge_df[[flow_col, pressure_col]].sort_values(by=pressure_col).reset_index(drop=True)
+
+    # 喘振线 = 每条转速曲线的左端点（用户已在数据中标记好的喘振位置）
+    # 直接连接各速度曲线的最高压力点（即过滤后每条曲线的起始端点）
+    if peak_info:
+        surge_line_df = pd.DataFrame([
+            {flow_col: info["flow"], pressure_col: info["pressure"]}
+            for info in peak_info.values()
+        ]).sort_values(by=pressure_col).reset_index(drop=True)
     else:
         surge_line_df = pd.DataFrame()
 
