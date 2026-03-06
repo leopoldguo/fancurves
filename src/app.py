@@ -26,6 +26,23 @@ st.markdown("""
     h1, h2, h3 {
         color: #E0E0E0 !important;
     }
+    /* ── IBI 品牌侧边栏蓝色主题 ── */
+    section[data-testid="stSidebar"] {
+        background-color: #4A6EA5 !important;
+    }
+    section[data-testid="stSidebar"] * {
+        color: #FFFFFF !important;
+    }
+    section[data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] > div,
+    section[data-testid="stSidebar"] .stNumberInput input,
+    section[data-testid="stSidebar"] .stTextInput input {
+        background-color: #3A5A8A !important;
+        border-color: #6A90C5 !important;
+        color: #FFFFFF !important;
+    }
+    section[data-testid="stSidebar"] hr {
+        border-color: #6A90C5 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
