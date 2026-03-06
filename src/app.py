@@ -37,11 +37,15 @@ html, body, [class*="css"] {
     font-family: var(--sans) !important;
     background-color: var(--bg-main) !important;
 }
-/* 主内容区域背景 */
+/* 主内容区域背景 + 页眉 */
 [data-testid="stAppViewContainer"],
 [data-testid="stMain"],
+[data-testid="stHeader"],
 .main .block-container {
     background-color: var(--bg-main) !important;
+}
+[data-testid="stHeader"] {
+    border-bottom: 1px solid rgba(94,128,200,0.25) !important;
 }
 
 /* ── Sidebar: IBI Brand Blue ── */
