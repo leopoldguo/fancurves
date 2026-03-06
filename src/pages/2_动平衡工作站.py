@@ -39,17 +39,18 @@ footer {visibility: hidden;}
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 # 标题区
-col1, col2 = st.columns([1, 10])
-with col2:
-    st.markdown("<h1 style='margin-bottom:0;'>⚖️ 动平衡去重工作站</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='color:#94a3b8; font-size:14px; margin-top:-10px; font-weight:bold;'>ISO 1940 标准计算 / 实体去重指导系统</p>", unsafe_allow_html=True)
+st.markdown("""
+<div style='text-align:center; padding: 12px 0;'>
+    <h1 style='margin-bottom:4px;'>⚖️ 动平衡去重工作站</h1>
+    <p style='color:#94a3b8; font-size:14px; margin:0; font-weight:bold;'>ISO 1940 标准计算 / 实体去重指导系统</p>
+</div>
+""", unsafe_allow_html=True)
 st.markdown("---")
 
 # 主体分为左右两部分：阶段 1 (测算) / 阶段 2 (去重)
 left_col, right_col = st.columns(2, gap="large")
 
 with left_col:
-    st.markdown("<div class='stage-card'>", unsafe_allow_html=True)
     st.subheader("阶段 1：平衡品质边界计算 (ISO 1940)")
     
     # 建立表单参数
@@ -110,10 +111,9 @@ with left_col:
         # 底部小字补充说明力矩
         st.markdown(f"<p style='text-align:center; color:#64748b; font-size:12px; margin-top:15px;'>总许可用力矩: {u_per_total:.2f} g·mm &nbsp;&nbsp;|&nbsp;&nbsp; 单面许用力矩({int(100/planes)}%): {u_per_plane:.2f} g·mm</p>", unsafe_allow_html=True)
 
-    st.markdown("</div>", unsafe_allow_html=True)
+
 
 with right_col:
-    st.markdown("<div class='stage-card'>", unsafe_allow_html=True)
     st.subheader("阶段 2：去重执行策略 (实体打孔深算)")
     
     amount_mg = st.number_input("平衡机显示的待去重质量 (超差值) [mg]", min_value=0.0, value=100.0, step=1.0)
@@ -167,4 +167,4 @@ with right_col:
     else:
         st.info("请输入合法的待去重质量与密度。")
         
-    st.markdown("</div>", unsafe_allow_html=True)
+
