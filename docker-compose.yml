@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  curves-app:
+    build: .
+    container_name: curves-streamlit
+    restart: unless-stopped
+    ports:
+      - "8501:8501"  # 外部端口:内部端口，可以根据需要修改前面的 8501
+    environment:
+      - TZ=Asia/Shanghai # 给容器设定正确的时区
+    # 如果你在群晖上需要映射额外的卷（保存配置等），可添加 volumes：
+    # volumes:
+    #   - ./data:/app/data
