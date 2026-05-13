@@ -7,6 +7,7 @@ from scipy.interpolate import UnivariateSpline, griddata, splprep, splev, interp
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from io import BytesIO
 
 _SMOOTH_POINTS = 300
 _CONTOUR_PTS   = 600
@@ -250,6 +251,8 @@ def create_performance_curve(
     show_efficiency: bool = False,
     eff_contour_step: float = 2.0,
     chart_title: str = "",        # 文件名，作为图表副标题
+    chart_subtitle: str = "性能曲线图",
+    chart_height: int | None = None,
 ) -> go.Figure:
 
     fig = make_subplots(specs=[[{"secondary_y": True}]])
@@ -285,7 +288,8 @@ def create_performance_curve(
             fig.add_trace(
                 go.Scatter(x=xs1, y=y1s, name=f'PR @ {int(speed)} RPM',
                            mode='lines', line=dict(color=color, width=2.5),
-                           legendgroup=str(speed)),
+                           legendgroup=str(speed),
+                           legendrank=i * 2),
                 secondary_y=False)
             fig.add_trace(
                 go.Scatter(x=xr, y=y1r, mode='markers',
@@ -299,7 +303,8 @@ def create_performance_curve(
                 fig.add_trace(
                     go.Scatter(x=xs2, y=y2s, name=f'Power @ {int(speed)} RPM',
                                mode='lines', line=dict(color=color, dash='dash', width=2),
-                               legendgroup=str(speed)),
+                               legendgroup=str(speed),
+                               legendrank=i * 2 + 1),
                     secondary_y=True)
                 fig.add_trace(
                     go.Scatter(x=xr, y=y2r, mode='markers',
@@ -314,7 +319,8 @@ def create_performance_curve(
             go.Scatter(x=surge_line_df[x_col], y=surge_line_df[y1_col],
                        name='Surge Line', mode='lines+markers',
                        line=dict(color='#FF3B30', width=2.5, dash='dot'),
-                       marker=dict(size=8, symbol='diamond-open', color='#FF3B30')),
+                       marker=dict(size=8, symbol='diamond-open', color='#FF3B30'),
+                       legendrank=999),
             secondary_y=False)
 
     if show_efficiency and "efficiency" in df.columns:
@@ -334,24 +340,50 @@ def create_performance_curve(
 
     # 标题和副标题对调：使用 Plotly 支持的 HTML 标签保证两者完美居中对齐
     if _display_title:
-        main_title_text = f"<b>{_display_title}</b><br><span style='font-size:15px;color:#A0B4D0;'>性能曲线图</span>"
+        main_title_text = f"<b>{_display_title}</b><br><span style='font-size:15px;color:#A0B4D0;'>{chart_subtitle}</span>"
     else:
-        main_title_text = "<b>性能曲线图</b>"
+        main_title_text = f"<b>{chart_subtitle}</b>"
+
+    legend_items = 0
+    if "speed_rpm" in df.columns:
+        legend_items += int(df["speed_rpm"].nunique())
+        if show_power and y2_col in df.columns:
+            legend_items += int(df["speed_rpm"].nunique())
+    if not surge_line_df.empty:
+        legend_items += 1
+    if show_efficiency and "efficiency" in df.columns:
+        legend_items += 4
+    if chart_height is None:
+        # Keep the main plot wide while reserving enough room for wrapped legend rows.
+        legend_rows = max(1, int(np.ceil(legend_items / 4)))
+        chart_height = 500 + min(170, legend_rows * 32)
     
     # 移除之前的 annotation，完全用 title 接管
     annotations = []
 
     fig.update_layout(
         title=dict(text=main_title_text, x=0.5, y=0.96, xanchor="center", yanchor="top", font=dict(size=22, color="#F5F7FA")),
+        autosize=True,
+        height=chart_height,
         plot_bgcolor="#131B2E", paper_bgcolor="#131B2E",
         hovermode="x unified",
         font=dict(family='"Microsoft YaHei", "WenQuanYi Micro Hei", "Noto Sans CJK SC", Arial, sans-serif', size=13, color="#E8EDF5"),
-        legend=dict(orientation="v", bordercolor="rgba(126,170,238,0.3)",
-                    borderwidth=1, bgcolor="rgba(19,27,46,0.90)"),
-        margin=dict(l=80, r=80, t=100, b=60),
+        legend=dict(
+            orientation="h",
+            yanchor="top", y=-0.25,
+            xanchor="center", x=0.5,
+            bordercolor="rgba(126,170,238,0.3)",
+            borderwidth=1,
+            bgcolor="rgba(19,27,46,0.90)",
+            font=dict(size=11),
+            itemwidth=30,
+            tracegroupgap=4,
+        ),
+        margin=dict(l=80, r=80, t=100, b=135),
         annotations=annotations,
     )
     fig.update_xaxes(title_text=x_label,
+                     title_standoff=12,
                      showgrid=True, gridcolor='rgba(94,128,200,0.2)',
                      showline=True, linecolor='rgba(94,128,200,0.5)', linewidth=1.5,
                      ticks="outside", ticklen=6, tickcolor='rgba(94,128,200,0.5)', mirror=True)
@@ -369,26 +401,61 @@ def create_performance_curve(
     return fig
 
 
-def create_performance_curve_export(fig_dark: go.Figure) -> go.Figure:
-    """从暗色交互图表生成白底、底部图例的导出版本（用于国标截图）。"""
+def create_performance_curve_export(
+    fig_dark: go.Figure,
+    summary_lines: list[str] | None = None,
+) -> go.Figure:
+    """从暗色交互图表生成白底导出版本，可附加性能汇总。"""
     import copy
     fig = copy.deepcopy(fig_dark)
+    summary_lines = summary_lines or []
+    base_height = int(fig_dark.layout.height or 620)
+    export_height = base_height + (130 if summary_lines else 0)
+    export_bottom_margin = 260 if summary_lines else 150
+
+    annotations = list(fig.layout.annotations) if fig.layout.annotations else []
+    if summary_lines:
+        annotations.append(
+            dict(
+                text="<br>".join(summary_lines),
+                xref="paper",
+                yref="paper",
+                x=0,
+                y=-0.42,
+                xanchor="left",
+                yanchor="top",
+                align="left",
+                showarrow=False,
+                font=dict(size=13, color="#111111"),
+                bgcolor="rgba(245,247,250,0.95)",
+                bordercolor="#BBBBBB",
+                borderwidth=1,
+                borderpad=8,
+            )
+        )
+
     fig.update_layout(
         plot_bgcolor="#FFFFFF",
         paper_bgcolor="#FFFFFF",
         font=dict(family='"Microsoft YaHei", "WenQuanYi Micro Hei", "Noto Sans CJK SC", Arial, sans-serif', color="#000000"),
         title_font_color="#000000",
+        autosize=True,
+        height=export_height,
         legend=dict(
             orientation="h",
-            yanchor="top", y=-0.18,
+            yanchor="top", y=-0.20,
             xanchor="center", x=0.5,
             bgcolor="rgba(255,255,255,0.9)",
             bordercolor="#CCCCCC", borderwidth=1,
-            font=dict(color="#000000")
+            font=dict(color="#000000", size=11),
+            itemwidth=30,
+            tracegroupgap=4,
         ),
-        margin=dict(l=80, r=80, t=100, b=120),
+        margin=dict(l=80, r=80, t=100, b=export_bottom_margin),
+        annotations=annotations,
     )
-    fig.update_xaxes(showgrid=True, gridcolor="#E0E0E0", linecolor="#666666",
+    fig.update_xaxes(title_standoff=12,
+                     showgrid=True, gridcolor="#E0E0E0", linecolor="#666666",
                      tickcolor="#666666", title_font_color="#000000", tickfont_color="#000000")
     fig.update_yaxes(showgrid=True, gridcolor="#E0E0E0", linecolor="#666666",
                      tickcolor="#666666", title_font_color="#000000", tickfont_color="#000000")
@@ -416,6 +483,113 @@ def create_performance_curve_export(fig_dark: go.Figure) -> go.Figure:
         )
 
     return fig
+
+
+def create_performance_report_png(
+    df: pd.DataFrame,
+    surge_line_df: pd.DataFrame,
+    x_col: str,
+    y1_col: str,
+    y2_col: str,
+    x_label: str,
+    y1_label: str,
+    y2_label: str,
+    title: str,
+    subtitle: str,
+    summary_lines: list[str] | None = None,
+    show_power: bool = True,
+) -> bytes:
+    """Render a static PNG report without Kaleido: chart, legend, and summary."""
+    summary_lines = summary_lines or []
+    plt.rcParams["font.sans-serif"] = [
+        "Microsoft YaHei", "SimHei", "Noto Sans CJK SC", "Arial Unicode MS", "DejaVu Sans"
+    ]
+    plt.rcParams["axes.unicode_minus"] = False
+
+    fig, ax1 = plt.subplots(figsize=(14, 8.5), dpi=180)
+    fig.patch.set_facecolor("white")
+    ax1.set_facecolor("white")
+    ax2 = ax1.twinx() if show_power and y2_col in df.columns else None
+
+    colors = ["#d62728", "#ff9900", "#ffcc00", "#2ca02c", "#4db6e6", "#007aff", "#8e44ad", "#e91e63"]
+    handles = []
+    labels = []
+
+    if "speed_rpm" in df.columns:
+        for i, speed in enumerate(sorted(df["speed_rpm"].dropna().unique(), reverse=True)):
+            color = colors[i % len(colors)]
+            sd = df[df["speed_rpm"] == speed].sort_values(x_col)
+            x = sd[x_col].to_numpy(float)
+            y = sd[y1_col].to_numpy(float)
+            xs, ys = _smooth_series(x, y, smooth_level=3.0)
+            line, = ax1.plot(xs, ys, color=color, linewidth=2.2, label=f"PR @ {int(speed)} RPM")
+            ax1.scatter(x, y, color=color, s=12, alpha=0.35)
+            handles.append(line)
+            labels.append(f"PR @ {int(speed)} RPM")
+
+            if ax2 is not None:
+                p = sd[y2_col].to_numpy(float)
+                xs2, ps = _smooth_series(x, p, smooth_level=3.0)
+                p_line, = ax2.plot(xs2, ps, color=color, linewidth=1.8, linestyle="--", label=f"Power @ {int(speed)} RPM")
+                handles.append(p_line)
+                labels.append(f"Power @ {int(speed)} RPM")
+
+    if not surge_line_df.empty and x_col in surge_line_df.columns and y1_col in surge_line_df.columns:
+        surge, = ax1.plot(
+            surge_line_df[x_col].to_numpy(float),
+            surge_line_df[y1_col].to_numpy(float),
+            color="#d62728",
+            linestyle=":",
+            marker="D",
+            markerfacecolor="none",
+            linewidth=2.2,
+            label="Surge Line",
+        )
+        handles.append(surge)
+        labels.append("Surge Line")
+
+    ax1.set_xlabel(x_label, fontsize=12, labelpad=8)
+    ax1.set_ylabel(y1_label, fontsize=12)
+    if ax2 is not None:
+        ax2.set_ylabel(y2_label, fontsize=12)
+
+    ax1.grid(True, color="#d9dee8", linewidth=0.8)
+    ax1.tick_params(axis="both", labelsize=10)
+    if ax2 is not None:
+        ax2.tick_params(axis="y", labelsize=10)
+
+    fig.suptitle(title, fontsize=18, fontweight="bold", y=0.965)
+    fig.text(0.5, 0.925, subtitle, ha="center", va="top", fontsize=12, color="#3b5fa0", fontweight="bold")
+
+    fig.legend(
+        handles,
+        labels,
+        loc="lower center",
+        bbox_to_anchor=(0.5, 0.165 if summary_lines else 0.04),
+        ncol=3,
+        fontsize=9,
+        frameon=True,
+        facecolor="white",
+        edgecolor="#bbbbbb",
+    )
+
+    if summary_lines:
+        fig.text(
+            0.08,
+            0.035,
+            "\n".join(summary_lines),
+            ha="left",
+            va="bottom",
+            fontsize=9.5,
+            color="#111111",
+            bbox=dict(boxstyle="round,pad=0.45", facecolor="#f5f7fa", edgecolor="#bbbbbb"),
+        )
+
+    fig.subplots_adjust(left=0.08, right=0.90 if ax2 is not None else 0.95, top=0.86, bottom=0.34 if summary_lines else 0.22)
+    buffer = BytesIO()
+    fig.savefig(buffer, format="png", facecolor=fig.get_facecolor(), bbox_inches="tight")
+    plt.close(fig)
+    return buffer.getvalue()
 
 
 def create_axial_force_curve(df: pd.DataFrame, x_col: str, force_col: str, flow_unit: str) -> go.Figure:

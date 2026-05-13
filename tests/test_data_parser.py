@@ -1,5 +1,5 @@
 import pandas as pd
-from src.data_parser import normalize_dataframe
+from src.data_parser import filter_valid_result_rows, normalize_dataframe, pressure_value_from_ratio
 
 def test_normalize_dataframe_headers():
     data = {"进口流量(kg/s)": [1.2], "压比": [1.05], "轴功率(kW)": [0.85], "设定转速(RPM)": [24000]}
@@ -11,6 +11,21 @@ def test_normalize_dataframe_headers():
     assert "shaft_power" in normalized_df.columns
     assert "speed_rpm" in normalized_df.columns
 
+def test_filter_valid_result_rows_removes_non_converged_and_invalid_points():
+    df = pd.DataFrame({
+        "mass_flow": [0.4, 0.0, 0.2, 0.3],
+        "pressure_ratio": [1.2, 1.1, 0.0, 1.3],
+        "shaft_power": [8.0, 7.0, 6.0, 5.0],
+        "speed_rpm": [20000, 20000, 20000, 20000],
+        "status_code": [0, 0, 0, 1],
+    })
+
+    filtered, stats = filter_valid_result_rows(df)
+
+    assert len(filtered) == 1
+    assert filtered.iloc[0]["mass_flow"] == 0.4
+    assert stats == {"input_rows": 4, "output_rows": 1, "removed_rows": 3}
+
 from src.data_parser import convert_flow_units
 
 def test_convert_flow_units():
@@ -21,6 +36,14 @@ def test_convert_flow_units():
     
     val_cfm = convert_flow_units(1.0, from_unit="m3/min", to_unit="CFM")
     assert round(val_cfm, 2) == 35.31
+
+def test_pressure_value_from_ratio_supports_metric_and_inch_water():
+    pr = 1.1
+    p_in_pa = 101325.0
+
+    assert round(pressure_value_from_ratio(pr, p_in_pa, "delta_kPa"), 3) == 10.133
+    assert round(pressure_value_from_ratio(pr, p_in_pa, "delta_in_h2o"), 2) == 40.68
+    assert round(pressure_value_from_ratio(pr, p_in_pa, "abs_kPa"), 3) == 111.458
 
 from src.data_parser import filter_operating_points
 

@@ -4,9 +4,9 @@ import pandas as pd
 from data_parser import (
     normalize_dataframe, convert_flow_units,
     filter_operating_points, convert_pressure_ratio_to_kpa,
-    compute_efficiency
+    compute_efficiency, filter_valid_result_rows, pressure_value_from_ratio
 )
-from plotter import create_performance_curve, create_performance_curve_export
+from plotter import create_performance_curve, create_performance_curve_export, create_performance_report_png
 
 import json
 import os
@@ -38,6 +38,9 @@ footer {visibility: hidden;}
 /* 减小顶部留白 */
 .block-container {
     padding-top: 1rem !important;
+    max-width: 96vw !important;
+    padding-left: 1.5rem !important;
+    padding-right: 1.5rem !important;
 }
 
     --mono:         'IBM Plex Mono', monospace;
@@ -219,15 +222,6 @@ if _header_logo_b64:
 else:
     _logo_tag = ""
 
-st.markdown(
-    f'<div style="display:flex;align-items:center;justify-content:center;padding:16px 0 8px 0;">'
-    f'{_logo_tag}'
-    f'<h1 style="margin:0;font-size:2.2rem;color:#F5F7FA;font-family:IBM Plex Sans,sans-serif;'
-    f'font-weight:700;letter-spacing:-0.02em;line-height:1.15;">风机性能曲线数据看板</h1>'
-    f'</div>',
-    unsafe_allow_html=True
-)
-
 PREFS_FILE = "user_prefs.json"
 
 def load_prefs():
@@ -248,10 +242,11 @@ def save_pref(key):
 if "prefs_loaded" not in st.session_state:
     prefs = load_prefs()
     defaults = {
+        "ui_language": "中文",
         "flow_unit": "kg/s",
-        "pressure_display": "压比 (PR)",
+        "pressure_display": "pressure_ratio",
         "show_power": True,
-        "page_mode": "性能曲线看板",
+        "page_mode": "performance",
         "has_seal": False,
         "has_impeller_holes": False,
         "has_backplate_holes": False,
@@ -268,6 +263,175 @@ if "prefs_loaded" not in st.session_state:
     for k, v in prefs.items():
         st.session_state[k] = v
     st.session_state["prefs_loaded"] = True
+
+LEGACY_PAGE_MODE = {
+    "性能曲线看板": "performance",
+    "轴向力深度分析": "axial",
+}
+LEGACY_PRESSURE_MODE = {
+    "压比 (PR)": "pressure_ratio",
+    "差压 (ΔkPa)": "delta_kPa",
+    "差压 (inH2O)": "delta_in_h2o",
+    "绝对出口压力 (kPa abs)": "abs_kPa",
+}
+if st.session_state.get("page_mode") in LEGACY_PAGE_MODE:
+    st.session_state["page_mode"] = LEGACY_PAGE_MODE[st.session_state["page_mode"]]
+if st.session_state.get("pressure_display") in LEGACY_PRESSURE_MODE:
+    st.session_state["pressure_display"] = LEGACY_PRESSURE_MODE[st.session_state["pressure_display"]]
+
+界面文案 = {
+    "中文": {
+        "control_panel": "控制面板",
+        "language": "语言",
+        "page_mode": "导航菜单",
+        "performance": "性能曲线看板",
+        "axial": "轴向力深度分析",
+        "upload": "上传 CFX 结果 (CSV)",
+        "unit_settings": "单位设置",
+        "flow_unit": "流量单位",
+        "flow_help": "体积流量均以当前工况密度换算；未提供入口压力/温度时按 20°C、1 标准大气压处理。",
+        "pressure_unit": "压力单位",
+        "pressure_help": "压差基于每行入口绝对压力计算；inH2O 按 1 inH2O = 249.08891 Pa。",
+        "pressure_ratio": "压比 (PR)",
+        "delta_kPa": "差压 (ΔkPa)",
+        "delta_in_h2o": "差压 (inH2O)",
+        "abs_kPa": "绝对出口压力 (kPa abs)",
+        "y_pressure_ratio": "压比 [-]",
+        "y_delta_kPa": "差压 ΔP [kPa]",
+        "y_delta_in_h2o": "差压 ΔP [inH2O]",
+        "y_abs_kPa": "绝对出口压力 [kPa]",
+        "title": "风机性能曲线数据看板",
+        "chart_subtitle": "性能曲线图",
+        "no_file": "请从左侧导入 CSV 数据文件开始。",
+        "read_error": "无法读取文件",
+        "missing_flow": "未识别流量列",
+        "missing_pressure": "未识别压力列",
+        "invalid_empty": "过滤非收敛/无效数据后没有可用工况点。请检查状态码、流量、压比、转速和功率列。",
+        "filtered_rows": "已自动剔除 {removed} / {total} 行非收敛或无效数据。",
+        "vacuum_kpa": "进口表压 [kPa]（真空模式，负值）",
+        "vacuum_inh2o": "进口表压 [inH2O]（真空模式，负值）",
+        "vacuum_notice": "真空模式已激活：检测到 CSV 入口压力中位数为 {value:.1f} kPa，低于 1 atm。Y 轴差压已自动切换为进口表压。",
+        "filter_threshold": "数据过滤阈值",
+        "min_pr": "最低压比阈值",
+        "max_power_enable": "启用最大功率阈值",
+        "max_power": "最大功率阈值 (kW)",
+        "surge_diag": "自动边界截断与喘振点诊断",
+        "peak_points": "检测到的真实数据最高压力点（截断基准）：",
+        "surge_note": "注：系统自动舍去了流量小于最高压力点的所有压降散点。若曲线在最高压力点左侧出现下垂，通常是 Spline 平滑过冲导致，不代表真实残留数据。",
+        "display_options": "显示选项",
+        "show_power": "显示功率曲线",
+        "show_eff": "显示等效率曲线 & BEP",
+        "show_eff_help": "叠加等效率等值线并标注 BEP",
+        "eff_step": "等效率线间距",
+        "no_eff": "CSV 缺少效率相关列，无法显示等效率线。",
+        "empty_after_filter": "所有数据均被过滤条件剔除，请放宽阈值。",
+        "empty_range": "当前流量范围内没有数据，请调整 X 轴显示范围。",
+        "x_flow": "流量 ({unit})",
+        "y_power": "轴功率 (kW)",
+        "download_html": "下载交互式性能图 HTML",
+        "generate_report_png": "生成报告 PNG",
+        "download_report_png": "下载报告 PNG",
+        "report_png_ready": "报告图片已生成，包含当前图表和汇总信息。",
+        "report_png_failed": "生成报告 PNG 失败",
+        "png_note": "PNG 报告会包含当前图表和下方汇总信息；需要先点击“生成报告 PNG”，再点击“下载报告 PNG”。",
+        "stats": "统计概览区",
+        "global_bep": "全局最高效率点 (Global BEP)",
+        "max_speed_bep": "最高转速工况 ({rpm} RPM)",
+        "max_eff": "最高效率",
+        "std_flow": "标准流量",
+        "speed": "所属转速",
+        "specific_speed": "比转速 (Ns)",
+        "eff_source_csv": "CSV 等熵效率列（直接值）",
+        "eff_source_calc": "等熵公式计算值",
+        "eff_caption": "效率数据来源：{source} | 比转速 Ns 公式采用国内压缩机标准绝热头算法",
+        "data_table": "查看当前渲染的数据表",
+        "col_speed": "转速 (RPM)",
+        "col_power": "轴功率 (kW)",
+        "col_eff": "等熵效率 [%]",
+    },
+    "English": {
+        "control_panel": "Control Panel",
+        "language": "Language",
+        "page_mode": "Module",
+        "performance": "Performance Map",
+        "axial": "Axial Force Analysis",
+        "upload": "Upload CFX Results (CSV)",
+        "unit_settings": "Unit Settings",
+        "flow_unit": "Flow Unit",
+        "flow_help": "Volumetric flow is converted with row-level density. If inlet state is absent, 20°C and 1 atm are used.",
+        "pressure_unit": "Pressure Unit",
+        "pressure_help": "Differential pressure is based on row-level inlet absolute pressure. 1 inH2O = 249.08891 Pa.",
+        "pressure_ratio": "Pressure Ratio (PR)",
+        "delta_kPa": "Differential Pressure (kPa)",
+        "delta_in_h2o": "Differential Pressure (inH2O)",
+        "abs_kPa": "Absolute Outlet Pressure (kPa abs)",
+        "y_pressure_ratio": "Pressure Ratio [-]",
+        "y_delta_kPa": "Differential Pressure ΔP [kPa]",
+        "y_delta_in_h2o": "Differential Pressure ΔP [inH2O]",
+        "y_abs_kPa": "Absolute Outlet Pressure [kPa]",
+        "title": "Fan Performance Curve Dashboard",
+        "chart_subtitle": "Performance Curve",
+        "no_file": "Upload a CSV file from the sidebar to start.",
+        "read_error": "Unable to read file",
+        "missing_flow": "Flow column was not recognized",
+        "missing_pressure": "Pressure column was not recognized",
+        "invalid_empty": "No usable operating points remain after filtering non-converged or invalid rows.",
+        "filtered_rows": "Automatically removed {removed} / {total} non-converged or invalid rows.",
+        "vacuum_kpa": "Inlet Gauge Pressure [kPa] (vacuum mode)",
+        "vacuum_inh2o": "Inlet Gauge Pressure [inH2O] (vacuum mode)",
+        "vacuum_notice": "Vacuum mode active: median inlet pressure is {value:.1f} kPa, below 1 atm.",
+        "filter_threshold": "Data Filters",
+        "min_pr": "Minimum PR",
+        "max_power_enable": "Enable max power limit",
+        "max_power": "Max Power Limit (kW)",
+        "surge_diag": "Boundary and Surge Diagnostics",
+        "peak_points": "Detected maximum pressure points:",
+        "surge_note": "Note: points left of each maximum-pressure point are removed. Left-side curve sag is usually spline overshoot, not retained source data.",
+        "display_options": "Display Options",
+        "show_power": "Show power curves",
+        "show_eff": "Show efficiency contours & BEP",
+        "show_eff_help": "Overlay iso-efficiency contours and mark BEP",
+        "eff_step": "Efficiency contour spacing",
+        "no_eff": "Efficiency columns are missing, so contours cannot be shown.",
+        "empty_after_filter": "All points were filtered out. Relax the thresholds.",
+        "empty_range": "No points are available in the current flow range.",
+        "x_flow": "Flow ({unit})",
+        "y_power": "Shaft Power (kW)",
+        "download_html": "Download Interactive HTML",
+        "generate_report_png": "Generate Report PNG",
+        "download_report_png": "Download Report PNG",
+        "report_png_ready": "Report image generated with the current chart and summary.",
+        "report_png_failed": "Failed to generate report PNG",
+        "png_note": "The PNG report includes the current chart and summary. Click Generate Report PNG first, then Download Report PNG.",
+        "stats": "Statistics",
+        "global_bep": "Global Best Efficiency Point",
+        "max_speed_bep": "Highest Speed Case ({rpm} RPM)",
+        "max_eff": "Best Efficiency",
+        "std_flow": "Flow",
+        "speed": "Speed",
+        "specific_speed": "Specific Speed (Ns)",
+        "eff_source_csv": "CSV isentropic efficiency column",
+        "eff_source_calc": "Calculated by isentropic formula",
+        "eff_caption": "Efficiency source: {source} | Ns uses the domestic compressor adiabatic-head formula",
+        "data_table": "Current rendered data",
+        "col_speed": "Speed (RPM)",
+        "col_power": "Shaft Power (kW)",
+        "col_eff": "Isentropic Efficiency [%]",
+    },
+}
+
+def 文案(key: str, **kwargs):
+    text = 界面文案[st.session_state.get("ui_language", "中文")][key]
+    return text.format(**kwargs) if kwargs else text
+
+st.markdown(
+    f'<div style="display:flex;align-items:center;justify-content:center;padding:16px 0 8px 0;">'
+    f'{_logo_tag}'
+    f'<h1 style="margin:0;font-size:2.2rem;color:#F5F7FA;font-family:IBM Plex Sans,sans-serif;'
+    f'font-weight:700;letter-spacing:0;line-height:1.15;">{文案("title")}</h1>'
+    f'</div>',
+    unsafe_allow_html=True
+)
 
 AIR_DENSITY_20C = 1.204
 
@@ -300,32 +464,44 @@ if os.path.exists(_logo_sidebar):
         f'<img src="data:image/png;base64,{_logo_b64}" style="width:100%;display:block;margin-bottom:8px;">',
         unsafe_allow_html=True
     )
-st.sidebar.header("控制面板")
+st.sidebar.header(文案("control_panel"))
+
+st.sidebar.radio(
+    文案("language"), ["中文", "English"],
+    key="ui_language", on_change=save_pref, args=("ui_language",),
+    horizontal=True
+)
 
 page_mode = st.sidebar.radio(
-    "导航菜单", ["性能曲线看板", "轴向力深度分析"],
-    key="page_mode", on_change=save_pref, args=("page_mode",)
+    文案("page_mode"), ["performance", "axial"],
+    key="page_mode", on_change=save_pref, args=("page_mode",),
+    format_func=lambda value: 文案(value)
 )
 st.sidebar.markdown("---")
 
-uploaded_file = st.sidebar.file_uploader("上传 CFX 结果 (CSV)", type=["csv"])
+uploaded_file = st.sidebar.file_uploader(文案("upload"), type=["csv"])
 
 unit_card = st.sidebar.container(border=True)
-unit_card.subheader("单位设置")
+unit_card.subheader(文案("unit_settings"))
 flow_unit = unit_card.selectbox(
-    "流量单位", ["kg/s", "m3/h", "m3/min", "CFM"],
-    help="体积流量均以 20°C、1 标准大气压（1.204 kg/m³）换算",
+    文案("flow_unit"), ["kg/s", "m3/h", "m3/min", "CFM"],
+    help=文案("flow_help"),
     key="flow_unit", on_change=save_pref, args=("flow_unit",)
 )
 pressure_display = unit_card.selectbox(
-    "压力单位", ["压比 (PR)", "差压 (ΔkPa)", "绝对出口压力 (kPa abs)"],
-    help="以标准大气压 101.325 kPa 为基准",
-    key="pressure_display", on_change=save_pref, args=("pressure_display",)
+    文案("pressure_unit"), ["pressure_ratio", "delta_kPa", "delta_in_h2o", "abs_kPa"],
+    help=文案("pressure_help"),
+    key="pressure_display", on_change=save_pref, args=("pressure_display",),
+    format_func=lambda value: 文案(value)
 )
 
-PRESSURE_MODE_MAP  = {"压比 (PR)": "pressure_ratio", "差压 (ΔkPa)": "delta_kPa", "绝对出口压力 (kPa abs)": "abs_kPa"}
-PRESSURE_LABEL_MAP = {"pressure_ratio": "压比 [-]", "delta_kPa": "差压 ΔP [kPa]", "abs_kPa": "绝对出口压力 [kPa]"}
-pressure_mode = PRESSURE_MODE_MAP[pressure_display]
+PRESSURE_LABEL_MAP = {
+    "pressure_ratio": 文案("y_pressure_ratio"),
+    "delta_kPa": 文案("y_delta_kPa"),
+    "delta_in_h2o": 文案("y_delta_in_h2o"),
+    "abs_kPa": 文案("y_abs_kPa"),
+}
+pressure_mode = pressure_display
 y1_label      = PRESSURE_LABEL_MAP[pressure_mode]
 
 # ─── 数据上传 ─────────────────────────────────────────────────────────────────
@@ -336,11 +512,24 @@ if uploaded_file:
         except UnicodeDecodeError:
             raw_df = pd.read_csv(uploaded_file, encoding='utf-8')
     except Exception as e:
-        st.error(f"无法读取文件: {e}"); st.stop()
+        st.error(f"{文案('read_error')}: {e}"); st.stop()
 
     df = normalize_dataframe(raw_df)
     if "mass_flow" not in df.columns:
-        st.error("未识别流量列"); st.stop()
+        st.error(文案("missing_flow")); st.stop()
+
+    df, valid_row_stats = filter_valid_result_rows(df)
+    if df.empty:
+        st.error(文案("invalid_empty"))
+        st.stop()
+    if valid_row_stats["removed_rows"] > 0:
+        st.sidebar.info(
+            文案(
+                "filtered_rows",
+                removed=valid_row_stats["removed_rows"],
+                total=valid_row_stats["input_rows"],
+            )
+        )
 
     # 流量单位换算：使用每行动态密度 rho（真空工况支持）
     df["display_flow"] = df.apply(
@@ -352,7 +541,7 @@ if uploaded_file:
     power_col        = "shaft_power"
 
     if pressure_raw_col not in df.columns:
-        st.error("未识别压力列"); st.stop()
+        st.error(文案("missing_pressure")); st.stop()
 
     # 效率：优先 CSV 直接值，否则等熵公式
     can_use_csv_eff = "efficiency_pct" in df.columns
@@ -362,7 +551,7 @@ if uploaded_file:
     has_efficiency  = can_use_csv_eff or can_compute_eff
     if has_efficiency:
         df = compute_efficiency(df)
-        eff_source = "CSV 等熵效率列（直接值）" if can_use_csv_eff else "等熵公式计算值"
+        eff_source = 文案("eff_source_csv") if can_use_csv_eff else 文案("eff_source_calc")
 
     # ─── 真空模式检测 ──────────────────────────────────────────────────────────────
     has_real_p_in = "p_in_pa" in df.columns and df["p_in_pa"].notna().any()
@@ -371,14 +560,16 @@ if uploaded_file:
 
     # 在真空+差压模式下，动态覆盖 Y 轴标签
     if is_vacuum and pressure_mode == "delta_kPa":
-        y1_label = "进口表压 [kPa]（真空模式，负值）"
+        y1_label = 文案("vacuum_kpa")
+    elif is_vacuum and pressure_mode == "delta_in_h2o":
+        y1_label = 文案("vacuum_inh2o")
 
     # ─── 过滤阈值 ─────────────────────────────────────────────────────────────
-    if page_mode == "性能曲线看板":
+    if page_mode == "performance":
         if is_vacuum:
-            st.info(f"🌌 **真空模式已激活**：检测到 CSV 入口压力中位数为 **{avg_p_in_kpa:.1f} kPa**，低于 1 atm。Y 轴「差压」已自动切换为进口表压（负 kPa）。")
+            st.info(文案("vacuum_notice", value=avg_p_in_kpa))
         st.sidebar.markdown("---")
-        st.sidebar.subheader("数据过滤阈值")
+        st.sidebar.subheader(文案("filter_threshold"))
         min_pr_val = float(df[pressure_raw_col].min())
         max_pr_val = float(df[pressure_raw_col].max())
 
@@ -386,7 +577,7 @@ if uploaded_file:
             st.session_state.min_pr_threshold = float(min_pr_val)
 
         min_pr_threshold = st.sidebar.number_input(
-            "最低压比阈值", min_value=1.0, max_value=float(max_pr_val),
+            文案("min_pr"), min_value=1.0, max_value=float(max_pr_val),
             step=0.01, format="%.4f", key="min_pr_threshold", on_change=save_pref, args=("min_pr_threshold",)
         )
         max_power_threshold = None
@@ -394,9 +585,9 @@ if uploaded_file:
             min_pwr = float(df[power_col].min())
             max_pwr = float(df[power_col].max())
             power_input_max = math.ceil(max_pwr) + 1
-            if st.sidebar.checkbox("启用最大功率阈值", value=False):
+            if st.sidebar.checkbox(文案("max_power_enable"), value=False):
                 max_power_threshold = st.sidebar.number_input(
-                    "最大功率阈值 (kW)",
+                    文案("max_power"),
                     min_value=float(min_pwr), max_value=float(power_input_max),
                     value=float(power_input_max), step=0.1, format="%.2f"
                 )
@@ -407,13 +598,13 @@ if uploaded_file:
             min_pressure=min_pr_threshold, max_power=max_power_threshold, power_col=power_col
         )
         if filtered_df.empty:
-            st.warning("所有数据均被过滤条件剔除，请放宽阈值。"); st.stop()
+            st.warning(文案("empty_after_filter")); st.stop()
 
-        with st.sidebar.expander("自动边界截断与喘振点诊断", expanded=False):
-            st.markdown("**检测到的真实数据最高压力点 (截断基准):**")
+        with st.sidebar.expander(文案("surge_diag"), expanded=False):
+            st.markdown(f"**{文案('peak_points')}**")
             for spd, info in peak_info.items():
                 st.text(f"{spd} RPM: 取最大值 PR={info['pressure']:.4f} @ Flow={info['flow']:.4f}")
-            st.markdown("*注：系统自动舍去了流量小于最高压力点的所有「压降」散点数据。图表中曲线在最高压力点左侧的下垂，通常是由于插值算法(Spline)在平滑连接时的视觉过冲导致，并非真实残留数据。*")
+            st.markdown(f"*{文案('surge_note')}*")
 
         # 压力单位换算（显示层）——基于每行入口绝对压力
         filtered_df = filtered_df.copy()
@@ -421,16 +612,7 @@ if uploaded_file:
         def row_pressure_display(row, mode, vacuum_mode=False):
             pr = row[pressure_raw_col]
             p_in = row.get("p_in_pa", 101325.0)
-            if mode == "delta_kPa":
-                if vacuum_mode:
-                    # 真空模式：显示进口表压（负小数 = 真空度）
-                    return (p_in - 101325.0) / 1000.0  # Pa → kPa ，得到负小数
-                else:
-                    return (pr - 1.0) * (p_in / 1000.0)
-            elif mode == "abs_kPa":
-                return pr * (p_in / 1000.0)
-            else:
-                return pr
+            return pressure_value_from_ratio(pr, p_in, mode, vacuum_mode)
 
         filtered_df["display_pressure"] = filtered_df.apply(
             lambda row: row_pressure_display(row, pressure_mode, is_vacuum), axis=1
@@ -443,21 +625,21 @@ if uploaded_file:
 
         # ─── 显示选项 ─────────────────────────────────────────────────────────────
         st.sidebar.markdown("---")
-        st.sidebar.subheader("显示选项")
-        show_power = st.sidebar.checkbox("显示功率曲线", key="show_power", on_change=save_pref, args=("show_power",))
+        st.sidebar.subheader(文案("display_options"))
+        show_power = st.sidebar.checkbox(文案("show_power"), key="show_power", on_change=save_pref, args=("show_power",))
 
         show_efficiency  = False
         eff_contour_step = 2.0
         if has_efficiency:
             show_efficiency = st.sidebar.checkbox(
-                "显示等效率曲线 & BEP", value=False,
-                help="叠加等效率等值线并标注 BEP"
+                文案("show_eff"), value=False,
+                help=文案("show_eff_help")
             )
             if show_efficiency:
-                step_label = st.sidebar.radio("等效率线间距", ["2%", "5%"], horizontal=True)
+                step_label = st.sidebar.radio(文案("eff_step"), ["2%", "5%"], horizontal=True)
                 eff_contour_step = 2.0 if step_label == "2%" else 5.0
         else:
-            st.sidebar.info("CSV 缺少效率相关列，无法显示等效率线。")
+            st.sidebar.info(文案("no_eff"))
 
         # ─── 曲线平滑度与 X 轴范围 (已精简) ──────────────────────────────────────────────
         perf_smooth = 3.0
@@ -466,55 +648,103 @@ if uploaded_file:
         # ─── 绘图容器 ──────────────────────────────────────────────────────────────
         plot_container = st.container(border=True)
         if final_df.empty:
-            plot_container.warning("当前流量范围内没有数据，请调整X轴显示范围。")
+            plot_container.warning(文案("empty_range"))
         else:
             _chart_title = getattr(uploaded_file, "name", "") if uploaded_file else ""
             fig = create_performance_curve(
                 final_df, surge_line_df,
                 x_col="display_flow", y1_col="display_pressure", y2_col=power_col,
-                x_label=f"流量 ({flow_unit})", y1_label=y1_label, y2_label="轴功率 (kW)",
+                x_label=文案("x_flow", unit=flow_unit), y1_label=y1_label, y2_label=文案("y_power"),
                 perf_smooth=perf_smooth,
                 eff_smooth=eff_smooth,
                 show_power=show_power,
                 show_efficiency=show_efficiency,
                 eff_contour_step=eff_contour_step,
                 chart_title=_chart_title,
+                chart_subtitle=文案("chart_subtitle"),
             )
-            plot_container.plotly_chart(fig, use_container_width=True)
-            
-            # 白底导出下载按鈕（国标顺时针：白底、图例在下）
-            try:
-                import plotly.io as pio
-                _fig_export = create_performance_curve_export(fig)
-                _png_bytes = pio.to_image(_fig_export, format="png", width=1200, height=750, scale=2)
-                _fname_stem = _chart_title.rsplit(".", 1)[0] if "." in _chart_title else _chart_title
-                _dl_name = f"{_fname_stem}_风机性能曲线图.png" if _fname_stem else "风机性能曲线图.png"
-                plot_container.download_button(
-                    label="⬇️ 下载白底高清 PNG（国标截图版：图例在下）",
-                    data=_png_bytes,
-                    file_name=_dl_name,
-                    mime="image/png"
+            plot_container.plotly_chart(fig, width="stretch")
+
+            report_summary_lines = []
+            if has_efficiency and "efficiency" in final_df.columns:
+                _bep_row = final_df.loc[final_df["efficiency"].idxmax()]
+                report_summary_lines.append(
+                    f"{文案('global_bep')}: "
+                    f"{文案('max_eff')} {_bep_row['efficiency']*100:.1f}% | "
+                    f"{文案('std_flow')} {_bep_row['display_flow']:.3f} {flow_unit} | "
+                    f"{y1_label} {_bep_row['display_pressure']:.4f} | "
+                    f"{文案('speed')} {int(_bep_row['speed_rpm'])} RPM"
                 )
-            except Exception as e:
-                plot_container.warning(f"⚠️ 生成白底高清图失败: {str(e)}。请确保已安装 kaleido==0.2.1")
-                plot_container.info("💡 鼠标悬停在图表右上角 → 相机图标 → 下载普通版 PNG")
+
+                _max_rpm = final_df["speed_rpm"].max()
+                _max_rpm_df = final_df[final_df["speed_rpm"] == _max_rpm]
+                if not _max_rpm_df.empty:
+                    _max_bep_row = _max_rpm_df.loc[_max_rpm_df["efficiency"].idxmax()]
+                    report_summary_lines.append(
+                        f"{文案('max_speed_bep', rpm=int(_max_rpm))}: "
+                        f"{文案('max_eff')} {_max_bep_row['efficiency']*100:.1f}% | "
+                        f"{文案('std_flow')} {_max_bep_row['display_flow']:.3f} {flow_unit} | "
+                        f"{y1_label} {_max_bep_row['display_pressure']:.4f}"
+                    )
+                report_summary_lines.append(文案("eff_caption", source=eff_source))
+            
+            _fname_stem = _chart_title.rsplit(".", 1)[0] if "." in _chart_title else _chart_title
+            _html_name = f"{_fname_stem}_风机性能曲线图.html" if _fname_stem else "风机性能曲线图.html"
+            plot_container.download_button(
+                label=文案("download_html"),
+                data=fig.to_html(include_plotlyjs="cdn"),
+                file_name=_html_name,
+                mime="text/html"
+            )
+            _png_name = f"{_fname_stem}_性能曲线报告.png" if _fname_stem else "性能曲线报告.png"
+            if plot_container.button(文案("generate_report_png")):
+                try:
+                    st.session_state["performance_report_png"] = create_performance_report_png(
+                        final_df,
+                        surge_line_df,
+                        x_col="display_flow",
+                        y1_col="display_pressure",
+                        y2_col=power_col,
+                        x_label=文案("x_flow", unit=flow_unit),
+                        y1_label=y1_label,
+                        y2_label=文案("y_power"),
+                        title=_fname_stem or 文案("chart_subtitle"),
+                        subtitle=文案("chart_subtitle"),
+                        summary_lines=report_summary_lines,
+                        show_power=show_power,
+                    )
+                    st.session_state["performance_report_png_name"] = _png_name
+                    plot_container.success(文案("report_png_ready"))
+                except Exception as e:
+                    plot_container.warning(f"{文案('report_png_failed')}: {e}")
+
+            if "performance_report_png" in st.session_state:
+                plot_container.download_button(
+                    label=文案("download_report_png"),
+                    data=st.session_state["performance_report_png"],
+                    file_name=st.session_state.get("performance_report_png_name", _png_name),
+                    mime="image/png",
+                )
+            plot_container.info(
+                文案("png_note")
+            )
 
         # ─── 统计容器 ──────────────────────────────────────────────────────────────
             stat_container = st.container(border=True)
-            stat_container.subheader("📊 统计概览区")
+            stat_container.subheader(文案("stats"))
 
             if has_efficiency and "efficiency" in final_df.columns:
                 # 全局 BEP
                 bep_row = final_df.loc[final_df["efficiency"].idxmax()]
                 ns_global = calc_specific_speed(bep_row['speed_rpm'], bep_row['display_flow'], flow_unit, bep_row[pressure_raw_col])
 
-                stat_container.markdown("**🌍 全局最高效率点 (Global BEP)**")
+                stat_container.markdown(f"**{文案('global_bep')}**")
                 c1, c2, c3, c4, c5 = stat_container.columns(5)
-                c1.metric("🏆 最高效率", f"{bep_row['efficiency']*100:.1f}%")
-                c2.metric("标准流量", f"{bep_row['display_flow']:.3f}")
+                c1.metric(文案("max_eff"), f"{bep_row['efficiency']*100:.1f}%")
+                c2.metric(文案("std_flow"), f"{bep_row['display_flow']:.3f}")
                 c3.metric(y1_label, f"{bep_row['display_pressure']:.4f}")
-                c4.metric("所属转速", f"{int(bep_row['speed_rpm'])} RPM")
-                c5.metric("比转速 (Ns)", f"{ns_global:.1f}")
+                c4.metric(文案("speed"), f"{int(bep_row['speed_rpm'])} RPM")
+                c5.metric(文案("specific_speed"), f"{ns_global:.1f}")
 
                 # 最高转速 BEP
                 max_rpm = final_df["speed_rpm"].max()
@@ -523,17 +753,17 @@ if uploaded_file:
                     max_bep_row = max_rpm_df.loc[max_rpm_df["efficiency"].idxmax()]
                     ns_max = calc_specific_speed(max_bep_row['speed_rpm'], max_bep_row['display_flow'], flow_unit, max_bep_row[pressure_raw_col])
 
-                    stat_container.markdown(f"**🚀 最高转速工况 ({int(max_rpm)} RPM)**")
+                    stat_container.markdown(f"**{文案('max_speed_bep', rpm=int(max_rpm))}**")
                     rc1, rc2, rc3, rc4, rc5 = stat_container.columns(5)
-                    rc1.metric("🏆 最高效率", f"{max_bep_row['efficiency']*100:.1f}%")
-                    rc2.metric("标准流量", f"{max_bep_row['display_flow']:.3f}")
+                    rc1.metric(文案("max_eff"), f"{max_bep_row['efficiency']*100:.1f}%")
+                    rc2.metric(文案("std_flow"), f"{max_bep_row['display_flow']:.3f}")
                     rc3.metric(y1_label, f"{max_bep_row['display_pressure']:.4f}")
-                    rc4.metric("所属转速", f"{int(max_bep_row['speed_rpm'])} RPM")
-                    rc5.metric("比转速 (Ns)", f"{ns_max:.1f}")
+                    rc4.metric(文案("speed"), f"{int(max_bep_row['speed_rpm'])} RPM")
+                    rc5.metric(文案("specific_speed"), f"{ns_max:.1f}")
 
-                stat_container.caption(f"效率数据来源：{eff_source} | 比转速 Ns 公式采用国内压缩机标准绝热头算法")
+                stat_container.caption(文案("eff_caption", source=eff_source))
 
-            with stat_container.expander("📋 查看当前渲染的数据表"):
+            with stat_container.expander(文案("data_table")):
                 display_cols = ["speed_rpm", "display_flow", "display_pressure"]
                 if power_col in final_df.columns: display_cols.append(power_col)
                 if "efficiency" in final_df.columns: display_cols.append("efficiency")
@@ -541,10 +771,10 @@ if uploaded_file:
                 if "efficiency" in show_df.columns:
                     show_df["efficiency"] = (show_df["efficiency"] * 100).round(2)
                 st.dataframe(show_df.rename(columns={
-                    "speed_rpm": "转速 (RPM)", "display_flow": f"流量 ({flow_unit})",
-                    "display_pressure": y1_label, power_col: "轴功率 (kW)", "efficiency": "等熵效率 [%]"
+                    "speed_rpm": 文案("col_speed"), "display_flow": 文案("x_flow", unit=flow_unit),
+                    "display_pressure": y1_label, power_col: 文案("col_power"), "efficiency": 文案("col_eff")
                 }))
-    elif page_mode == "轴向力深度分析":
+    elif page_mode == "axial":
         from force_calculator import calculate_backplate_force, calculate_total_axial_force
         
         st.subheader("⚙️ 轴向力深度分析")
@@ -711,4 +941,4 @@ if uploaded_file:
                 }))
 
 else:
-    st.info("👈 请从左侧导入 CSV 数据文件开始。")
+    st.info(文案("no_file"))

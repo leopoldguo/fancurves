@@ -8,11 +8,14 @@ HEADER_MAP = {
     "等熵效率": "efficiency_pct",   # CFX provides this directly (unit: %)
     "轴向力(N)": "axial_force",
     "进口压力": "p_in_pa",
-    "进口温度": "t_in_c"
+    "进口温度": "t_in_c",
+    "状态码": "status_code",
+    "备注": "remark"
 }
 
 P_ATM_KPA       = 101.325    # kPa
 P_ATM_PA        = 101325.0   # Pa
+PA_PER_IN_H2O   = 249.08891
 AIR_DENSITY_20C = 1.204      # kg/m³ at 20°C, 1 atm
 
 # Isentropic efficiency constants (only used as fallback when CSV lacks η column)
@@ -47,6 +50,39 @@ def normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     df_clean["rho"] = df_clean["p_in_pa"] / (287.058 * (df_clean["t_in_c"] + 273.15))
         
     return df_clean
+
+def filter_valid_result_rows(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+    """Remove non-converged and physically invalid result rows before plotting."""
+    result = df.copy()
+    initial_count = len(result)
+
+    if "status_code" in result.columns:
+        status = pd.to_numeric(result["status_code"], errors="coerce")
+        result = result[status.eq(0)]
+
+    numeric_required = ["mass_flow", "pressure_ratio", "speed_rpm"]
+    if "shaft_power" in result.columns:
+        numeric_required.append("shaft_power")
+
+    for col in numeric_required:
+        if col in result.columns:
+            result[col] = pd.to_numeric(result[col], errors="coerce")
+
+    positive_required = ["mass_flow", "pressure_ratio", "speed_rpm"]
+    if "shaft_power" in result.columns:
+        positive_required.append("shaft_power")
+
+    for col in positive_required:
+        if col in result.columns:
+            result = result[result[col].notna() & (result[col] > 0)]
+
+    result = result.reset_index(drop=True)
+    stats = {
+        "input_rows": initial_count,
+        "output_rows": len(result),
+        "removed_rows": initial_count - len(result),
+    }
+    return result, stats
 
 def convert_flow_units(value: float, from_unit: str, to_unit: str, density: float = AIR_DENSITY_20C) -> float:
     """在 kg/s, m3/min, m3/h, CFM 之间转换流量单位。
@@ -84,6 +120,20 @@ def convert_pressure_ratio_to_kpa(pressure_ratio_series: pd.Series, mode: str) -
         return pressure_ratio_series * P_ATM_KPA
     else:
         return pressure_ratio_series
+
+def pressure_value_from_ratio(pr: float, p_in_pa: float, mode: str, vacuum_mode: bool = False) -> float:
+    """Convert pressure ratio to the selected display pressure unit."""
+    if mode == "delta_kPa":
+        if vacuum_mode:
+            return (p_in_pa - P_ATM_PA) / 1000.0
+        return (pr - 1.0) * (p_in_pa / 1000.0)
+    if mode == "delta_in_h2o":
+        if vacuum_mode:
+            return (p_in_pa - P_ATM_PA) / PA_PER_IN_H2O
+        return ((pr - 1.0) * p_in_pa) / PA_PER_IN_H2O
+    if mode == "abs_kPa":
+        return pr * (p_in_pa / 1000.0)
+    return pr
 
 def compute_efficiency(df: pd.DataFrame) -> pd.DataFrame:
     """
