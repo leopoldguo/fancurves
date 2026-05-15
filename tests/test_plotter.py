@@ -1,5 +1,12 @@
 import pandas as pd
-from src.plotter import create_performance_curve, create_performance_curve_export, create_performance_report_png
+from matplotlib import font_manager
+from src import plotter
+from src.plotter import (
+    _get_cjk_font_properties,
+    create_performance_curve,
+    create_performance_curve_export,
+    create_performance_report_png,
+)
 
 def test_create_performance_curve_returns_figure():
     df = pd.DataFrame({
@@ -104,3 +111,12 @@ def test_create_performance_report_png_returns_png_bytes():
 
     assert png.startswith(b"\x89PNG\r\n\x1a\n")
     assert len(png) > 1000
+
+def test_cjk_font_properties_can_be_resolved_from_existing_font_file(monkeypatch):
+    known_font = font_manager.findfont("DejaVu Sans")
+    monkeypatch.setattr(plotter, "_CJK_FONT_PATHS", [known_font])
+
+    resolved = _get_cjk_font_properties()
+
+    assert resolved is not None
+    assert resolved.get_file() == known_font

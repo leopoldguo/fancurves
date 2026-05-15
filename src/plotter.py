@@ -7,10 +7,34 @@ from scipy.interpolate import UnivariateSpline, griddata, splprep, splev, interp
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from matplotlib import font_manager
 from io import BytesIO
+from pathlib import Path
 
 _SMOOTH_POINTS = 300
 _CONTOUR_PTS   = 600
+
+_CJK_FONT_PATHS = [
+    "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+    "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    "C:/Windows/Fonts/msyh.ttc",
+    "C:/Windows/Fonts/simhei.ttf",
+]
+
+
+def _get_cjk_font_properties() -> font_manager.FontProperties | None:
+    for font_path in _CJK_FONT_PATHS:
+        if Path(font_path).exists():
+            return font_manager.FontProperties(fname=font_path)
+    for font_name in ["Microsoft YaHei", "SimHei", "WenQuanYi Micro Hei", "WenQuanYi Zen Hei", "Noto Sans CJK SC"]:
+        try:
+            resolved = font_manager.findfont(font_name, fallback_to_default=False)
+        except ValueError:
+            continue
+        if resolved and Path(resolved).exists():
+            return font_manager.FontProperties(fname=resolved)
+    return None
 
 
 # ─── Performance curve smoothing ─────────────────────────────────────────────
@@ -501,9 +525,13 @@ def create_performance_report_png(
 ) -> bytes:
     """Render a static PNG report without Kaleido: chart, legend, and summary."""
     summary_lines = summary_lines or []
-    plt.rcParams["font.sans-serif"] = [
-        "Microsoft YaHei", "SimHei", "Noto Sans CJK SC", "Arial Unicode MS", "DejaVu Sans"
-    ]
+    cjk_font = _get_cjk_font_properties()
+    if cjk_font is not None:
+        plt.rcParams["font.sans-serif"] = [cjk_font.get_name(), "DejaVu Sans"]
+    else:
+        plt.rcParams["font.sans-serif"] = [
+            "Microsoft YaHei", "SimHei", "WenQuanYi Micro Hei", "Noto Sans CJK SC", "DejaVu Sans"
+        ]
     plt.rcParams["axes.unicode_minus"] = False
 
     fig, ax1 = plt.subplots(figsize=(14, 8.5), dpi=180)
@@ -548,18 +576,18 @@ def create_performance_report_png(
         handles.append(surge)
         labels.append("Surge Line")
 
-    ax1.set_xlabel(x_label, fontsize=12, labelpad=8)
-    ax1.set_ylabel(y1_label, fontsize=12)
+    ax1.set_xlabel(x_label, fontsize=12, labelpad=8, fontproperties=cjk_font)
+    ax1.set_ylabel(y1_label, fontsize=12, fontproperties=cjk_font)
     if ax2 is not None:
-        ax2.set_ylabel(y2_label, fontsize=12)
+        ax2.set_ylabel(y2_label, fontsize=12, fontproperties=cjk_font)
 
     ax1.grid(True, color="#d9dee8", linewidth=0.8)
     ax1.tick_params(axis="both", labelsize=10)
     if ax2 is not None:
         ax2.tick_params(axis="y", labelsize=10)
 
-    fig.suptitle(title, fontsize=18, fontweight="bold", y=0.965)
-    fig.text(0.5, 0.925, subtitle, ha="center", va="top", fontsize=12, color="#3b5fa0", fontweight="bold")
+    fig.suptitle(title, fontsize=18, fontweight="bold", y=0.965, fontproperties=cjk_font)
+    fig.text(0.5, 0.925, subtitle, ha="center", va="top", fontsize=12, color="#3b5fa0", fontweight="bold", fontproperties=cjk_font)
 
     fig.legend(
         handles,
@@ -568,6 +596,7 @@ def create_performance_report_png(
         bbox_to_anchor=(0.5, 0.165 if summary_lines else 0.04),
         ncol=3,
         fontsize=9,
+        prop=cjk_font,
         frameon=True,
         facecolor="white",
         edgecolor="#bbbbbb",
@@ -582,6 +611,7 @@ def create_performance_report_png(
             va="bottom",
             fontsize=9.5,
             color="#111111",
+            fontproperties=cjk_font,
             bbox=dict(boxstyle="round,pad=0.45", facecolor="#f5f7fa", edgecolor="#bbbbbb"),
         )
 
