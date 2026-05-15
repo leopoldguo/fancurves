@@ -1,0 +1,12 @@
+.git
+.venv
+.venv.*
+.pytest_cache
+__pycache__/
+*.pyc
+baseline_outputs/
+user_prefs.json
+streamlit.log
+streamlit.err.log
+8kwfan_Results.csv
+8KW风机.csv

@@ -1,5 +1,10 @@
 import pandas as pd
-from src.data_parser import filter_valid_result_rows, normalize_dataframe, pressure_value_from_ratio
+from src.data_parser import (
+    filter_valid_result_rows,
+    normalize_dataframe,
+    pressure_value_from_ratio,
+    title_from_filename,
+)
 
 def test_normalize_dataframe_headers():
     data = {"进口流量(kg/s)": [1.2], "压比": [1.05], "轴功率(kW)": [0.85], "设定转速(RPM)": [24000]}
@@ -44,6 +49,10 @@ def test_pressure_value_from_ratio_supports_metric_and_inch_water():
     assert round(pressure_value_from_ratio(pr, p_in_pa, "delta_kPa"), 3) == 10.133
     assert round(pressure_value_from_ratio(pr, p_in_pa, "delta_in_h2o"), 2) == 40.68
     assert round(pressure_value_from_ratio(pr, p_in_pa, "abs_kPa"), 3) == 111.458
+
+def test_title_from_filename_keeps_chinese_and_translates_common_terms():
+    assert title_from_filename("8KW风机测试结果.csv", "中文") == "8KW风机测试结果"
+    assert title_from_filename("8KW风机测试结果.csv", "English") == "8KW Fan Test Results"
 
 from src.data_parser import filter_operating_points
 

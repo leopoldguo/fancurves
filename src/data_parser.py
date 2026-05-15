@@ -1,4 +1,5 @@
 import pandas as pd
+import re
 
 HEADER_MAP = {
     "进口流量": "mass_flow",
@@ -17,6 +18,39 @@ P_ATM_KPA       = 101.325    # kPa
 P_ATM_PA        = 101325.0   # Pa
 PA_PER_IN_H2O   = 249.08891
 AIR_DENSITY_20C = 1.204      # kg/m³ at 20°C, 1 atm
+
+TITLE_TRANSLATION_TERMS = {
+    "风机": "Fan",
+    "性能": "Performance",
+    "曲线": "Curve",
+    "测试": "Test",
+    "结果": "Results",
+    "数据": "Data",
+    "报告": "Report",
+    "叶轮": "Impeller",
+    "压缩机": "Compressor",
+    "真空": "Vacuum",
+    "流量": "Flow",
+    "压比": "Pressure Ratio",
+    "功率": "Power",
+    "效率": "Efficiency",
+}
+
+def title_from_filename(filename: str, language: str = "中文") -> str:
+    """Build a chart title from filename, translating common Chinese terms in English UI."""
+    if not filename:
+        return ""
+    title = filename.rsplit(".", 1)[0]
+    title = title.strip()
+    if language != "English":
+        return title
+
+    translated = title
+    for cn, en in sorted(TITLE_TRANSLATION_TERMS.items(), key=lambda item: len(item[0]), reverse=True):
+        translated = translated.replace(cn, f" {en} ")
+    translated = re.sub(r"[\s_-]+", " ", translated).strip()
+    translated = re.sub(r"\s+", " ", translated)
+    return translated or title
 
 # Isentropic efficiency constants (only used as fallback when CSV lacks η column)
 _GAMMA = 1.4

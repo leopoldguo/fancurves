@@ -4,7 +4,8 @@ import pandas as pd
 from data_parser import (
     normalize_dataframe, convert_flow_units,
     filter_operating_points, convert_pressure_ratio_to_kpa,
-    compute_efficiency, filter_valid_result_rows, pressure_value_from_ratio
+    compute_efficiency, filter_valid_result_rows, pressure_value_from_ratio,
+    title_from_filename
 )
 from plotter import create_performance_curve, create_performance_curve_export, create_performance_report_png
 
@@ -651,6 +652,7 @@ if uploaded_file:
             plot_container.warning(文案("empty_range"))
         else:
             _chart_title = getattr(uploaded_file, "name", "") if uploaded_file else ""
+            _display_title = title_from_filename(_chart_title, st.session_state.get("ui_language", "中文"))
             fig = create_performance_curve(
                 final_df, surge_line_df,
                 x_col="display_flow", y1_col="display_pressure", y2_col=power_col,
@@ -660,7 +662,7 @@ if uploaded_file:
                 show_power=show_power,
                 show_efficiency=show_efficiency,
                 eff_contour_step=eff_contour_step,
-                chart_title=_chart_title,
+                chart_title=_display_title,
                 chart_subtitle=文案("chart_subtitle"),
             )
             plot_container.plotly_chart(fig, width="stretch")
@@ -688,7 +690,7 @@ if uploaded_file:
                     )
                 report_summary_lines.append(文案("eff_caption", source=eff_source))
             
-            _fname_stem = _chart_title.rsplit(".", 1)[0] if "." in _chart_title else _chart_title
+            _fname_stem = _display_title or (_chart_title.rsplit(".", 1)[0] if "." in _chart_title else _chart_title)
             _html_name = f"{_fname_stem}_风机性能曲线图.html" if _fname_stem else "风机性能曲线图.html"
             plot_container.download_button(
                 label=文案("download_html"),
